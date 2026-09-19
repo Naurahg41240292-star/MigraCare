@@ -109,13 +109,15 @@ class _SplashScreenState extends State<SplashScreen>
                       padding: const EdgeInsets.fromLTRB(24, 22, 24, 0),
                       child: Row(
                         children: [
-                          CustomPaint(
-                            size: const Size(38, 32),
-                            painter: _BrainPainter(showPlus: false),
+                          Image.asset(
+                            'assets/images/logo.png',
+                            width: 42,
+                            height: 42,
+                            fit: BoxFit.contain,
                           ),
                           const SizedBox(width: 8),
                           const Text(
-                            '+ MigraCare',
+                            'MigraCare',
                             style: TextStyle(
                               fontSize: 21,
                               fontWeight: FontWeight.w800,
@@ -130,9 +132,11 @@ class _SplashScreenState extends State<SplashScreen>
                     const Spacer(flex: 2),
 
                     // Ilustrasi otak besar
-                    CustomPaint(
-                      size: const Size(230, 200),
-                      painter: _BrainPainter(),
+                    Image.asset (
+                      'assets/images/otak_besar.png',
+                      width: 240,
+                      height: 210,
+                      fit: BoxFit.contain,
                     ),
 
                     const SizedBox(height: 36),
@@ -236,90 +240,6 @@ class _SlideUpRoute<T> extends PageRouteBuilder<T> {
             );
           },
         );
-}
-
-// ===========================================================================
-//  PAINTER: ILUSTRASI OTAK (outline krem, digambar manual)
-// ===========================================================================
-class _BrainPainter extends CustomPainter {
-  _BrainPainter({this.showPlus = true});
-
-  final bool showPlus;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width, h = size.height;
-
-    // Jalur belahan otak kiri (outline + belahan tengah + lipatan)
-    final half = Path()
-      ..moveTo(w * 0.53, h * 0.80)
-      ..cubicTo(w * 0.40, h * 0.88, w * 0.24, h * 0.85, w * 0.20, h * 0.70)
-      ..cubicTo(w * 0.06, h * 0.67, w * 0.01, h * 0.50, w * 0.11, h * 0.40)
-      ..cubicTo(w * 0.07, h * 0.22, w * 0.24, h * 0.08, w * 0.40, h * 0.14)
-      ..cubicTo(w * 0.44, h * 0.02, w * 0.50, h * 0.04, w * 0.50, h * 0.12);
-
-    final mid = Path()
-      ..moveTo(w * 0.50, h * 0.12)
-      ..quadraticBezierTo(w * 0.485, h * 0.45, w * 0.53, h * 0.80);
-
-    final gyri = Path()
-      ..moveTo(w * 0.34, h * 0.16)
-      ..quadraticBezierTo(w * 0.28, h * 0.28, w * 0.36, h * 0.32)
-      ..moveTo(w * 0.14, h * 0.36)
-      ..quadraticBezierTo(w * 0.26, h * 0.40, w * 0.28, h * 0.52)
-      ..moveTo(w * 0.20, h * 0.60)
-      ..quadraticBezierTo(w * 0.32, h * 0.58, w * 0.36, h * 0.68)
-      ..moveTo(w * 0.44, h * 0.24)
-      ..quadraticBezierTo(w * 0.40, h * 0.36, w * 0.46, h * 0.44);
-
-    void drawHalf() {
-      // Lapisan lembut di bawah (efek emboss)
-      final soft = Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = w * 0.075
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round
-        ..color = _Sp.brainSoft;
-      canvas.drawPath(half, soft);
-      canvas.drawPath(mid, soft);
-
-      // Outline utama
-      final main = Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = w * 0.045
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round
-        ..color = _Sp.brain;
-      canvas.drawPath(half, main);
-      canvas.drawPath(mid, main);
-      canvas.drawPath(gyri, main);
-    }
-
-    drawHalf();
-
-    // Belahan otak kanan = cermin kiri
-    canvas.save();
-    canvas.translate(w, 0);
-    canvas.scale(-1, 1);
-    drawHalf();
-    canvas.restore();
-
-    // Tanda plus di kanan bawah
-    if (showPlus) {
-      final cx = w * 0.88, cy = h * 0.76, arm = w * 0.075;
-      final plus = Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = w * 0.05
-        ..strokeCap = StrokeCap.round
-        ..color = _Sp.brain;
-      canvas.drawLine(Offset(cx - arm, cy), Offset(cx + arm, cy), plus);
-      canvas.drawLine(Offset(cx, cy - arm), Offset(cx, cy + arm), plus);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _BrainPainter oldDelegate) =>
-      oldDelegate.showPlus != showPlus;
 }
 
 // ===========================================================================
