@@ -1,26 +1,24 @@
 import 'package:flutter/material.dart';
-import 'screens/beranda.dart';
+import 'screens/splash.dart'; // ← dulu: screens/beranda.dart
 
 void main() {
-  runApp(const MigraCareApp());
+  runApp(const MigracareApp());
 }
 
-class MigraCareApp extends StatelessWidget {
-  const MigraCareApp({super.key});
+class MigracareApp extends StatelessWidget {
+  const MigracareApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      title: 'Migracare',
       debugShowCheckedModeBanner: false,
-      title: 'MigraCare',
       theme: ThemeData(
         useMaterial3: true,
-        fontFamily: 'Arial',
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFB98B73),
-        ),
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF6B4A2B)),
+        scaffoldBackgroundColor: const Color(0xFFFAF4EA),
       ),
-      home: const BerandaPage(),
+      home: const SplashScreen(), // ← dulu: BerandaPage()
     );
   }
 }

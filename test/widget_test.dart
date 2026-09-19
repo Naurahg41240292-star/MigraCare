@@ -1,30 +1,40 @@
-// This is a basic Flutter widget test.
+// ========================================================================
+//  MIGRACARE — Tes Dasar
+//  File: test/widget_test.dart
 //
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
+//  Catatan: file ini awalnya berisi "Counter increments smoke test"
+//  bawaan Flutter yang memanggil MyApp. Karena aplikasi kita sudah
+//  menjadi MigracareApp (bukan aplikasi counter lagi), tes lama itu
+//  tidak valid dan menimbulkan error "MyApp isn't a class".
+//  File ini menggantinya dengan tes yang benar-benar relevan.
+// ========================================================================
 
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:migracare/main.dart';
+import 'package:migracare/models/artikel.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  test('Data artikel populer tersedia dan lengkap', () {
+    // Pastikan minimal ada 1 artikel
+    expect(artikelPopuler, isNotEmpty);
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    for (final artikel in artikelPopuler) {
+      // Setiap artikel wajib punya judul, tanggal, dan isi
+      expect(artikel.title, isNotEmpty);
+      expect(artikel.date, isNotEmpty);
+      expect(artikel.sections, isNotEmpty);
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+      for (final bagian in artikel.sections) {
+        expect(bagian.heading, isNotEmpty);
+        expect(bagian.paragraphs, isNotEmpty);
+      }
+    }
+  });
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+  test('Judul artikel pertama sesuai yang diharapkan', () {
+    expect(
+      artikelPopuler.first.title,
+      'Mengenal Migraine dan Cara Mengelolanya',
+    );
   });
 }
