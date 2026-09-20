@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'beranda.dart';
+import 'halaman_utama.dart';
 import 'daftar.dart';
 
 /// ==========================================================================
@@ -63,7 +63,7 @@ class _MasukPageState extends State<MasukPage> {
     // TODO: nanti validasi ke server/Firebase di sini.
     // Untuk sekarang: login langsung berhasil → Beranda.
     Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const BerandaPage()),
+      MaterialPageRoute(builder: (_) => const HalamanUtama()),
       (route) => false, // bersihkan tumpukan halaman (splash, onboarding, dll)
     );
   }
