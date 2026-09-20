@@ -16,28 +16,17 @@ abstract class _Ob {
   static const Color glow = Color(0xFFF7EDD9);
 }
 
-/// Elemen dekoratif di sekitar ilustrasi utama
-class _Deco {
-  const _Deco(this.emoji, this.alignment, this.size, {this.rotation = 0});
-  final String emoji;
-  final Alignment alignment;
-  final double size;
-  final double rotation;
-}
-
 /// Data satu halaman onboarding
 class _OnboardData {
   const _OnboardData({
     required this.title,
     required this.description,
-    required this.emoji,
-    required this.decorations,
+    required this.image,
   });
 
   final String title;
   final String description;
-  final String emoji;
-  final List<_Deco> decorations;
+  final String image;
 }
 
 class OnboardingPage extends StatefulWidget {
@@ -56,40 +45,19 @@ class _OnboardingPageState extends State<OnboardingPage> {
       title: 'Kenali Migraine Anda',
       description:
           'Aplikasi yang membantu Anda melakukan skrining, memantau, mengelola migrain, dan menjaga kesehatan dengan lebih baik',
-      emoji: '🤦‍♀️',
-      decorations: [
-        _Deco('🌀', Alignment(-0.72, -0.92), 30),
-        _Deco('⚡', Alignment(-0.85, -0.30), 40, rotation: -0.25),
-        _Deco('⚡', Alignment(0.78, -0.72), 44, rotation: 0.2),
-        _Deco('➕', Alignment(0.88, -0.20), 26),
-        _Deco('➕', Alignment(-0.88, 0.20), 20),
-        _Deco('✨', Alignment(0.92, 0.15), 18),
-      ],
+       image: 'assets/images/foto_onboarding 1.png',
     ),
     _OnboardData(
       title: 'Pantau Migraine Anda',
       description:
           'Catat intensitas, durasi, gejala, dan pemicu migraine dari waktu ke waktu',
-      emoji: '📋',
-      decorations: [
-        _Deco('📅', Alignment(-0.72, -0.85), 42, rotation: -0.1),
-        _Deco('⏰', Alignment(0.78, -0.80), 38),
-        _Deco('➕', Alignment(0.45, -0.95), 20),
-        _Deco('✏️', Alignment(0.80, 0.20), 32, rotation: 0.3),
-        _Deco('✨', Alignment(-0.85, 0.15), 20),
-      ],
+       image: 'assets/images/foto_onboarding 2.png',
     ),
     _OnboardData(
       title: 'Kelola Kesehatan Anda',
       description:
           'Dapatkan wawasan dan rekomendasi pribadi berbantuan AI untuk hidup lebih nyaman tanpa migrain',
-      emoji: '🧠',
-      decorations: [
-        _Deco('✨', Alignment(0.80, -0.88), 30),
-        _Deco('💊', Alignment(-0.80, -0.45), 34, rotation: -0.2),
-        _Deco('📈', Alignment(0.78, 0.25), 36),
-        _Deco('💛', Alignment(-0.78, 0.50), 24),
-      ],
+      image: 'assets/images/foto_onboarding 3.png',
     ),
   ];
 
@@ -135,12 +103,12 @@ class _OnboardingPageState extends State<OnboardingPage> {
                     padding: const EdgeInsets.symmetric(horizontal: 28),
                     child: Column(
                       children: [
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 50),
                         Text(
                           data.title,
                           textAlign: TextAlign.center,
                           style: const TextStyle(
-                            fontSize: 21,
+                            fontSize: 30,
                             fontWeight: FontWeight.w800,
                             color: _Ob.textDark,
                           ),
@@ -150,7 +118,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                           data.description,
                           textAlign: TextAlign.center,
                           style: const TextStyle(
-                            fontSize: 13,
+                            fontSize: 20,
                             height: 1.7,
                             fontWeight: FontWeight.w500,
                             color: _Ob.textGrey,
@@ -232,9 +200,7 @@ class _Dots extends StatelessWidget {
 }
 
 // ===========================================================================
-//  ILUSTRASI (emoji utama + dekorasi + glow lembut — tanpa aset)
-//  Nanti kalau sudah punya gambar asli: ganti Text(data.emoji) dengan
-//  Image.asset('assets/images/onboard1.png', width: 260).
+// ILUSTRASI
 // ===========================================================================
 class _Illustration extends StatelessWidget {
   const _Illustration({required this.data});
@@ -264,19 +230,15 @@ class _Illustration extends StatelessWidget {
                 ),
               ),
             ),
-            // Karakter utama
+
+            // Gambar utama
             Center(
-              child: Text(data.emoji, style: const TextStyle(fontSize: 120)),
-            ),
-            // Elemen dekoratif melayang
-            for (final d in data.decorations)
-              Align(
-                alignment: d.alignment,
-                child: Transform.rotate(
-                  angle: d.rotation,
-                  child: Text(d.emoji, style: TextStyle(fontSize: d.size)),
-                ),
+              child: Image.asset(
+                data.image,
+                width: 265,
+                fit: BoxFit.contain,
               ),
+            ),
           ],
         ),
       ),

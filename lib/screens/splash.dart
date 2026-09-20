@@ -6,16 +6,6 @@ import 'onboarding.dart';
 ///  File: lib/screens/splash.dart
 /// ==========================================================================
 
-abstract class _Sp {
-  static const Color bg = Color(0xFFFAF4EA);
-  static const Color gold = Color(0xFFC08A2B);
-  static const Color textDark = Color(0xFF33261A);
-  static const Color textGrey = Color(0xFF8F8578);
-  static const Color brain = Color(0xFFEAD5AE);
-  static const Color brainSoft = Color(0xFFF5E9D2);
-  static const Color indicator = Color(0xFF6E5B41);
-}
-
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -90,9 +80,17 @@ class _SplashScreenState extends State<SplashScreen>
         child: Stack(
           children: [
             // ---------------- Gelombang emas (paling belakang) -------------
-            Positioned.fill(
-              child: CustomPaint(painter: _WavePainter()),
-            ),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 50,
+                height: 420, // tinggi area gelombang, coba-coba: 180 / 200 / 230
+                child: Image.asset(
+                  'assets/images/gelombang.png',
+                  fit: BoxFit.cover,
+                  alignment: Alignment.bottomCenter,
+                ),
+              ),
 
             // ---------------- Konten ---------------------------------------
             SafeArea(
@@ -105,29 +103,17 @@ class _SplashScreenState extends State<SplashScreen>
                 child: Column(
                   children: [
                     // Logo kiri atas
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 22, 24, 0),
-                      child: Row(
-                        children: [
-                          Image.asset(
-                            'assets/images/logo.png',
-                            width: 42,
-                            height: 42,
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Image.asset(
+                            'assets/images/logo_atas.png',
+                            height: 48,
                             fit: BoxFit.contain,
                           ),
-                          const SizedBox(width: 8),
-                          const Text(
-                            'MigraCare',
-                            style: TextStyle(
-                              fontSize: 21,
-                              fontWeight: FontWeight.w800,
-                              color: _Sp.gold,
-                              letterSpacing: 0.2,
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
-                    ),
 
                     const Spacer(flex: 2),
 
@@ -315,4 +301,10 @@ class _WavePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _WavePainter oldDelegate) => false;
+}
+class _Sp {
+  static const Color bg = Color(0xFFFDF9F4);
+  static const Color textDark = Color(0xFF3A3028);
+  static const Color textGrey = Color(0xFF8A8178);
+  static const Color indicator = Color(0xFFC5A46D);
 }
