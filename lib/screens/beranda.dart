@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import '../models/artikel.dart';
 import 'detail_artikel.dart';
 import 'skrining.dart';
+import 'pengingat_obat.dart';
+import '../models/obat.dart';
 
 /// ==========================================================================
-///  MIGRACARE — Halaman Beranda (v9)
+///  MIGRACARE — Halaman Beranda (v10)
 ///  File: lib/screens/beranda.dart
 /// ==========================================================================
 
@@ -98,6 +100,135 @@ class _BerandaPageState extends State<BerandaPage> {
     }
   }
 
+  // ===== Navigasi ke halaman Pengingat Obat =====
+  Future<void> _bukaPengingatObat() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const PengingatObatPage()),
+    );
+    setState(() {}); // refresh kartu pengingat setelah kembali
+  }
+
+  // ====== SECTION PENGINGAT OBAT (DINAMIS) ======
+  Widget _buildSectionPengingatObat() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Pengingat Obat',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textDark,
+            ),
+          ),
+          const SizedBox(height: 12),
+          GestureDetector(
+            onTap: _bukaPengingatObat,
+            child: _isiKartuPengingat(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _isiKartuPengingat() {
+    final store = PengingatStore.instance;
+
+    if (store.daftarObat.isEmpty) {
+      return _kartuPengingat(Row(
+        children: [
+          _ikonBulat(Icons.medication_outlined),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              'Belum ada pengingat obat.\nKetuk kartu ini untuk mengatur pengingat.',
+              style: TextStyle(color: AppColors.textGrey, height: 1.4),
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.primary,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Text('+ Atur',
+                style:
+                    TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ));
+    }
+
+    final obat = store.obatBerikutnya ?? store.daftarObat.first;
+    return _kartuPengingat(Row(
+      children: [
+        _ikonBulat(Icons.access_time_rounded),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(obat.jam,
+                  style:
+                      const TextStyle(color: AppColors.textGrey, fontSize: 13)),
+              Text('${obat.nama} ${obat.dosis}',
+                  style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textDark)),
+              Text(obat.aturan,
+                  style:
+                      const TextStyle(color: AppColors.textGrey, fontSize: 13)),
+            ],
+          ),
+        ),
+        obat.sudahDiminum
+            ? const Text('✓ Sudah diminum',
+                style: TextStyle(
+                    color: Color(0xFF3E7C3E), fontWeight: FontWeight.w700))
+            : ElevatedButton(
+                onPressed: () => setState(() => obat.sudahDiminum = true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: AppColors.darkBrown,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20)),
+                ),
+                child: const Text('Sudah Diminum'),
+              ),
+      ],
+    ));
+  }
+
+  Widget _kartuPengingat(Widget child) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.outline),
+      ),
+      child: child,
+    );
+  }
+
+  Widget _ikonBulat(IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: const BoxDecoration(
+        color: AppColors.background,
+        shape: BoxShape.circle,
+      ),
+      child: Icon(icon, color: AppColors.primary),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -105,37 +236,32 @@ class _BerandaPageState extends State<BerandaPage> {
       body: SafeArea(
         bottom: false,
         child: SingleChildScrollView(
+          padding: const EdgeInsets.only(bottom: 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 8),
+              const SizedBox(height: 20),
               const _GreetingHeader(),
               const SizedBox(height: 20),
               const _AiMigraineBanner(),
               const SizedBox(height: 24),
               _SectionHeader(
                 title: 'Informasi Layanan',
-                onSeeAll: () =>
-                    showAppSnack(context, 'Menuju halaman Informasi Layanan'),
+                onSeeAll: () => showAppSnack(
+                    context, 'Fitur Lihat Semua sedang dikembangkan'),
               ),
               const SizedBox(height: 12),
-              _ServiceList(services: _services),
+              const _ServiceList(services: _services),
               const SizedBox(height: 24),
-              const _SectionHeader(title: 'Pengingat Obat'),
-              const SizedBox(height: 12),
-              const _MedicationReminderCard(
-                time: '20.00',
-                medicine: 'Topiramate 50 mg',
-                dosage: '1 tablet. Setelah makan',
-              ),
+              _buildSectionPengingatObat(),
               const SizedBox(height: 24),
               _SectionHeader(
                 title: 'Artikel Populer',
-                onSeeAll: () => showAppSnack(context, 'Menuju halaman Artikel'),
+                onSeeAll: () => showAppSnack(
+                    context, 'Fitur Lihat Semua sedang dikembangkan'),
               ),
               const SizedBox(height: 12),
-              const _ArticleList(articles: artikelPopuler),
-              const SizedBox(height: 24),
+             _ArticleList(articles: artikelPopuler)
             ],
           ),
         ),
@@ -172,8 +298,8 @@ class _GreetingHeader extends StatelessWidget {
                 ),
                 SizedBox(height: 4),
                 Text(
-                  // PENANDA VERSI v9 — hapus setelah semua beres!
-                  'Bagaimana Kondisi Anda hari ini?  •  v9',
+                  // PENANDA VERSI v10 — kalau di layar sudah v10, berarti build terbaru jalan!
+                  'Bagaimana Kondisi Anda hari ini?  •  v10',
                   style: TextStyle(fontSize: 13, color: AppColors.textGrey),
                 ),
               ],
@@ -474,111 +600,6 @@ class _ServiceCard extends StatelessWidget {
                           ),
                   ],
                 ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ============================ PENGINGAT OBAT ===============================
-class _MedicationReminderCard extends StatefulWidget {
-  const _MedicationReminderCard({
-    required this.time,
-    required this.medicine,
-    required this.dosage,
-  });
-
-  final String time;
-  final String medicine;
-  final String dosage;
-
-  @override
-  State<_MedicationReminderCard> createState() =>
-      _MedicationReminderCardState();
-}
-
-class _MedicationReminderCardState extends State<_MedicationReminderCard> {
-  bool _isTaken = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.outline),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 46,
-              height: 46,
-              decoration: BoxDecoration(
-                color: const Color(0xFFFDF3D7),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(
-                Icons.access_time_rounded,
-                color: Color(0xFFC99A2C),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.time,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textGrey,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    widget.medicine,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textDark,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    widget.dosage,
-                    style:
-                        const TextStyle(fontSize: 11, color: AppColors.textGrey),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            ElevatedButton(
-              onPressed:
-                  _isTaken ? null : () => setState(() => _isTaken = true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.accent,
-                foregroundColor: AppColors.darkBrown,
-                disabledBackgroundColor: const Color(0xFFE8E2D6),
-                disabledForegroundColor: const Color(0xFF9A938B),
-                elevation: 0,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              child: Text(
-                _isTaken ? '✓ Selesai' : 'Sudah Diminum',
-                style: const TextStyle(
-                    fontSize: 11.5, fontWeight: FontWeight.w700),
               ),
             ),
           ],
