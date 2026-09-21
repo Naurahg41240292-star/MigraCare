@@ -1,28 +1,27 @@
 import 'package:flutter/material.dart';
 
 import '../theme.dart';
+import '../services/screening_service.dart';
+import 'hasil_analisis.dart';
 
 /// ==========================================================================
 ///  MIGRACARE — Halaman Skrining (Migraine Monitor)
 ///  File: lib/screens/skrining.dart
 /// ==========================================================================
 
-/// Warna tambahan khusus halaman skrining
 abstract class _Sk {
-  static const Color selected = Color(0xFFDD9438); // chip/kartu terpilih
+  static const Color selected = Color(0xFFDD9438);
   static const Color chipBorder = Color(0xFFD8CDBB);
-  static const Color control = Color(0xFFC9822E); // slider, radio, checkbox, tombol
-  static const Color sliderInactive = Color(0xFFE7DFD2);
-  static const Color skin = Color(0xFFF6DFC8); // warna kulit ilustrasi
-  static const Color pain = Color(0xFFE04B37); // area nyeri
+  static const Color control = Color(0xFFC9822E);
+  static const Color skin = Color(0xFFF6DFC8);
+  static const Color pain = Color(0xFFE04B37);
 }
 
-/// Satu pilihan lokasi nyeri (posisi titik nyeri pada ilustrasi kepala)
 class _Lokasi {
   const _Lokasi(this.label, this.spots, {this.full = false});
   final String label;
   final List<Alignment> spots;
-  final bool full; // true = seluruh kepala
+  final bool full;
 }
 
 class SkriningPage extends StatefulWidget {
@@ -34,50 +33,76 @@ class SkriningPage extends StatefulWidget {
 
 class _SkriningPageState extends State<SkriningPage> {
   // ------------------------------ STATE FORM ------------------------------
-  DateTime _tanggalLahir = DateTime(2001, 5, 28);
-  double _intensitas = 6;
-  final TextEditingController _durasiController =
-      TextEditingController(text: '4');
-  int? _frekuensi;
-  int? _karakter;
-  final Set<int> _lokasi = {6}; // sesuai desain: Belakang Kepala terpilih
-  final Set<String> _gejala = {'Photophobia (Sensitif cahaya)'};
-  final Set<String> _pemicu = {'Kurang Tidur', 'Cuaca'};
+  DateTime? _tanggalLahir;
+  int? _intensitas;   // 0–3
+  int? _durasi;       // 1–3
+  int? _frekuensi;    // 1–8
+  int? _karakter;     // 0–2
+  final Set<int> _lokasi = {};
+  final Set<String> _gejala = {};
+  final Set<String> _visualAura = {};
+  int? _sensory;      // 0–2
   final Set<int> _neuro = {};
-  int? _riwayatKeluarga; // 0 = Ya, 1 = Tidak
+  final Set<String> _pemicu = {};
+  int? _riwayatKeluarga; // 1 = Ya, 0 = Tidak
+
+  @override
+  void initState() {
+    super.initState();
+    ScreeningService.instance.ensureLoaded();
+  }
 
   // ------------------------------ DATA OPSI -------------------------------
   static const List<String> _frekuensiOpsi = [
-    '1 Kali',
-    '2–3 kali',
-    '4–5 kali',
-    '> 5 kali',
+    '1 Kali', '2 Kali', '3 Kali', '4 Kali',
+    '5 Kali', '6 Kali', '7 Kali', '8 Kali',
   ];
+
   static const List<String> _karakterOpsi = ['Menusuk', 'Berdenyut', 'Menekan'];
+
   static const List<String> _gejalaOpsi = [
     'Nausea (Mual)',
     'Vomit (Muntah)',
-    'Photophobia (Sensitif cahaya)',
-    'Visual (Gangguan penglihatan)',
     'Phonophobia (Sensitif suara)',
+    'Photophobia (Sensitif cahaya)',
   ];
+
   static const List<String> _pemicuOpsi = [
-    'Kurang Tidur',
-    'Stres',
-    'Makanan',
-    'Cuaca',
-    'Menstruasi',
-    'Lainnya',
+    'Kurang Tidur', 'Stres', 'Makanan', 'Cuaca', 'Menstruasi', 'Lainnya',
   ];
+
+  static const List<String> _visualAuraOpsi = [
+    'Kilatan cahaya',
+    'Bintik/titik pada penglihatan',
+    'Garis/pola zig-zag',
+    'Penglihatan menghilang/terganggu',
+  ];
+
+  static const List<String> _sensoryOpsi = ['Tidak ada', '1 gejala', '2 gejala'];
+
+  static const List<String> _durasiOpsi = [
+    '1–72 jam',
+    '> 72 jam',
+    'Terus-menerus',
+  ];
+
+  static const List<String> _intensitasOpsi = [
+    'Tidak ada', 'Ringan', 'Sedang', 'Berat',
+  ];
+
   static const List<String> _neuroOpsi = [
-    'Gangguan Sensorik (Sensory)',
     'Kesulitan berbicara (Dysphasia)',
-    'Gangguan koordinasi (Ataxia)',
-    'Penglihatan ganda (Diplopia)',
+    'Gangguan bicara/artikulasi (Dysarthria)',
+    'Pusing berputar (Vertigo)',
     'Telinga berdenging (Tinnitus)',
     'Gangguan pendengaran (Hypoacusis)',
+    'Penglihatan ganda (Diplopia)',
+    'Gangguan lapang penglihatan (Defect)',
+    'Gangguan koordinasi (Ataxia)',
+    'Gangguan kesadaran (Conscience)',
     'Mati rasa / Kesemutan (Paresthesia)',
   ];
+
   static const List<_Lokasi> _lokasiOpsi = [
     _Lokasi('Sakit Kepala', [], full: true),
     _Lokasi('Satu Sisi Kepala', [Alignment(0.45, -0.1)]),
@@ -89,18 +114,26 @@ class _SkriningPageState extends State<SkriningPage> {
     _Lokasi('Lainnya', [Alignment(0.6, 0.3)]),
   ];
 
-  @override
-  void dispose() {
-    _durasiController.dispose();
-    super.dispose();
+  static const List<int> _lokasiNilai = [2, 1, 1, 2, 1, 1, 1, 1];
+
+  int get _lokasiFinal {
+    if (_lokasi.isEmpty) return 0;
+    return _lokasi.any((i) => _lokasiNilai[i] == 2) ? 2 : 1;
   }
 
   // ------------------------------ HELPER ----------------------------------
-  String get _labelIntensitas {
-    if (_intensitas <= 3) return 'Ringan';
-    if (_intensitas <= 7) return 'Sedang';
-    return 'Berat';
+  int get _umur {
+    final now = DateTime.now();
+    final tgl = _tanggalLahir!;
+    int umur = now.year - tgl.year;
+    if (now.month < tgl.month || (now.month == tgl.month && now.day < tgl.day)) {
+      umur--;
+    }
+    return umur;
   }
+
+  String get _labelIntensitas =>
+      _intensitas == null ? '-' : _intensitasOpsi[_intensitas!];
 
   String _formatTanggal(DateTime d) {
     const bulan = [
@@ -128,7 +161,7 @@ class _SkriningPageState extends State<SkriningPage> {
   Future<void> _pilihTanggal() async {
     final picked = await showDatePicker(
       context: context,
-      initialDate: _tanggalLahir,
+      initialDate: DateTime(2000),
       firstDate: DateTime(1940),
       lastDate: DateTime.now(),
       builder: (context, child) => Theme(
@@ -141,12 +174,32 @@ class _SkriningPageState extends State<SkriningPage> {
     if (picked != null) setState(() => _tanggalLahir = picked);
   }
 
+  List<double> buildFeatureVector() => [
+        _umur.toDouble(),
+        (_durasi! + 1).toDouble(),
+        (_frekuensi! + 1).toDouble(),
+        _lokasiFinal.toDouble(),
+        (_karakter! + 1).toDouble(),
+        _intensitas!.toDouble(),
+        _gejala.contains('Nausea (Mual)') ? 1 : 0,
+        _gejala.contains('Vomit (Muntah)') ? 1 : 0,
+        _gejala.contains('Phonophobia (Sensitif suara)') ? 1 : 0,
+        _gejala.contains('Photophobia (Sensitif cahaya)') ? 1 : 0,
+        _visualAura.length.toDouble(),
+        _sensory!.toDouble(),
+        for (int i = 0; i < 10; i++) _neuro.contains(i) ? 1 : 0,
+        _riwayatKeluarga!.toDouble(),
+      ];
+
   void _selanjutnya() {
-    // Validasi field wajib
     final kurang = <String>[
+      if (_tanggalLahir == null) 'Tanggal Lahir',
+      if (_durasi == null) 'Durasi',
       if (_frekuensi == null) 'Frequency',
       if (_karakter == null) 'Character',
+      if (_intensitas == null) 'Intensitas',
       if (_lokasi.isEmpty) 'Lokasi Nyeri',
+      if (_sensory == null) 'Gejala Sensorik',
       if (_riwayatKeluarga == null) 'Riwayat Keluarga',
     ];
     if (kurang.isNotEmpty) {
@@ -154,7 +207,11 @@ class _SkriningPageState extends State<SkriningPage> {
       return;
     }
 
-    final durasi = _durasiController.text.trim();
+    if (_umur < 15 || _umur > 77) {
+      _showSnack('Umur harus di rentang 15–77 tahun sesuai dataset.');
+      return;
+    }
+
     final lokasiLabel = _lokasi.map((i) => _lokasiOpsi[i].label).join(', ');
 
     showDialog(
@@ -180,14 +237,17 @@ class _SkriningPageState extends State<SkriningPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  _recap('Tanggal Lahir', _formatTanggal(_tanggalLahir)),
-                  _recap('Intensitas',
-                      '$_labelIntensitas (${_intensitas.toInt()}/10)'),
-                  _recap('Durasi', durasi.isEmpty ? '-' : '$durasi jam'),
-                  _recap('Frekuensi', _frekuensiOpsi[_frekuensi!]),
+                  _recap('Tanggal Lahir',
+                      '${_formatTanggal(_tanggalLahir!)} (${_umur} th)'),
+                  _recap('Intensitas', _labelIntensitas),
+                  _recap('Durasi', _durasiOpsi[_durasi!]),
+                  _recap('Frekuensi', '${_frekuensiOpsi[_frekuensi!]} / minggu'),
                   _recap('Karakter', _karakterOpsi[_karakter!]),
                   _recap('Lokasi Nyeri', lokasiLabel),
                   _recap('Gejala', _gejala.isEmpty ? '-' : _gejala.join(', ')),
+                  _recap('Aura Visual',
+                      _visualAura.isEmpty ? '-' : _visualAura.join(', ')),
+                  _recap('Gejala Sensorik', _sensoryOpsi[_sensory!]),
                   _recap('Pemicu', _pemicu.isEmpty ? '-' : _pemicu.join(', ')),
                   _recap(
                     'Gejala Neurologis',
@@ -195,8 +255,8 @@ class _SkriningPageState extends State<SkriningPage> {
                         ? '-'
                         : _neuro.map((i) => _neuroOpsi[i]).join(', '),
                   ),
-                  _recap(
-                      'Riwayat Keluarga', _riwayatKeluarga == 0 ? 'Ya' : 'Tidak'),
+                  _recap('Riwayat Keluarga',
+                      _riwayatKeluarga == 1 ? 'Ya' : 'Tidak'),
                 ],
               ),
             ),
@@ -210,10 +270,25 @@ class _SkriningPageState extends State<SkriningPage> {
               ),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 Navigator.of(context).pop();
-                _showSnack('✓ Data skrining tersimpan. Analisis AI segera hadir!');
-                // TODO: nanti di sini Navigator.push ke halaman hasil analisis
+
+                try {
+                  await ScreeningService.instance.ensureLoaded();
+
+                  final result =
+                      ScreeningService.instance.predict(buildFeatureVector());
+                  if (!mounted) return;
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => HasilAnalisisPage(result: result),
+                    ),
+                  );
+                } catch (e) {
+                  if (!mounted) return;
+                  _showSnack('ERROR: $e');
+                }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: _Sk.control,
@@ -296,13 +371,33 @@ class _SkriningPageState extends State<SkriningPage> {
               // -------------------- INTENSITAS NYERI -----------------------
               const _SectionTitle('Intensitas Nyeri'),
               const SizedBox(height: 8),
-              _intensitasCard(),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: List.generate(_intensitasOpsi.length, (i) {
+                  return _chip(
+                    _intensitasOpsi[i],
+                    _intensitas == i,
+                    () => setState(() => _intensitas = i),
+                  );
+                }),
+              ),
               const SizedBox(height: 20),
 
               // -------------------- DURASI ---------------------------------
               const _SectionTitle('Durasi'),
               const SizedBox(height: 8),
-              _durasiField(),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: List.generate(_durasiOpsi.length, (i) {
+                  return _chip(
+                    _durasiOpsi[i],
+                    _durasi == i,
+                    () => setState(() => _durasi = i),
+                  );
+                }),
+              ),
               const SizedBox(height: 20),
 
               // -------------------- FREQUENCY ------------------------------
@@ -312,14 +407,28 @@ class _SkriningPageState extends State<SkriningPage> {
                     'Seberapa sering Anda mengalami migrain dalam seminggu?',
               ),
               const SizedBox(height: 4),
-              ...List.generate(_frekuensiOpsi.length, (i) {
-                return _radioRow(
-                  _frekuensiOpsi[i],
-                  i,
-                  _frekuensi,
-                  (v) => setState(() => _frekuensi = v),
-                );
-              }),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      children: List.generate(4, (i) {
+                        return _radioRow(_frekuensiOpsi[i], i, _frekuensi,
+                            (v) => setState(() => _frekuensi = v));
+                      }),
+                    ),
+                  ),
+                  Expanded(
+                    child: Column(
+                      children: List.generate(4, (i) {
+                        final idx = i + 4;
+                        return _radioRow(_frekuensiOpsi[idx], idx, _frekuensi,
+                            (v) => setState(() => _frekuensi = v));
+                      }),
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 20),
 
               // -------------------- CHARACTER ------------------------------
@@ -370,12 +479,45 @@ class _SkriningPageState extends State<SkriningPage> {
                     .map((g) => _chip(
                           g,
                           _gejala.contains(g),
-                          () => setState(() =>
-                              _gejala.contains(g)
-                                  ? _gejala.remove(g)
-                                  : _gejala.add(g)),
+                          () => setState(() => _gejala.contains(g)
+                              ? _gejala.remove(g)
+                              : _gejala.add(g)),
                         ))
                     .toList(),
+              ),
+              const SizedBox(height: 20),
+
+              // -------------------- AURA VISUAL ----------------------------
+              const _SectionTitle(
+                'Gangguan Visual (Aura)',
+                subtitle: 'Pilih semua gangguan penglihatan yang Anda alami.',
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _visualAuraOpsi
+                    .map((v) => _chip(
+                          v,
+                          _visualAura.contains(v),
+                          () => setState(() => _visualAura.contains(v)
+                              ? _visualAura.remove(v)
+                              : _visualAura.add(v)),
+                        ))
+                    .toList(),
+              ),
+              const SizedBox(height: 20),
+
+              // -------------------- SENSORIK -------------------------------
+              const _SectionTitle('Gejala Sensorik (Sensory)'),
+              const SizedBox(height: 4),
+              Row(
+                children: List.generate(_sensoryOpsi.length, (i) {
+                  return Expanded(
+                    child: _radioRow(_sensoryOpsi[i], i, _sensory,
+                        (v) => setState(() => _sensory = v)),
+                  );
+                }),
               ),
               const SizedBox(height: 20),
 
@@ -392,10 +534,9 @@ class _SkriningPageState extends State<SkriningPage> {
                     .map((p) => _chip(
                           p,
                           _pemicu.contains(p),
-                          () => setState(() =>
-                              _pemicu.contains(p)
-                                  ? _pemicu.remove(p)
-                                  : _pemicu.add(p)),
+                          () => setState(() => _pemicu.contains(p)
+                              ? _pemicu.remove(p)
+                              : _pemicu.add(p)),
                         ))
                     .toList(),
               ),
@@ -407,8 +548,8 @@ class _SkriningPageState extends State<SkriningPage> {
               ...List.generate(_neuroOpsi.length, (i) {
                 return CheckboxListTile(
                   value: _neuro.contains(i),
-                  onChanged: (v) => setState(
-                      () => v! ? _neuro.add(i) : _neuro.remove(i)),
+                  onChanged: (v) =>
+                      setState(() => v! ? _neuro.add(i) : _neuro.remove(i)),
                   title: Text(
                     _neuroOpsi[i],
                     style: const TextStyle(
@@ -434,11 +575,11 @@ class _SkriningPageState extends State<SkriningPage> {
               Row(
                 children: [
                   Expanded(
-                    child: _radioRow('Ya', 0, _riwayatKeluarga,
+                    child: _radioRow('Ya', 1, _riwayatKeluarga,
                         (v) => setState(() => _riwayatKeluarga = v)),
                   ),
                   Expanded(
-                    child: _radioRow('Tidak', 1, _riwayatKeluarga,
+                    child: _radioRow('Tidak', 0, _riwayatKeluarga,
                         (v) => setState(() => _riwayatKeluarga = v)),
                   ),
                 ],
@@ -472,12 +613,11 @@ class _SkriningPageState extends State<SkriningPage> {
           ),
         ),
       ),
-      // CATATAN: bottom nav TIDAK ADA di sini — nav dipasang di HalamanUtama.
     );
   }
 
   // -------------------------------------------------------------------------
-  //  WIDGET KECIL (field, kartu, chip, radio, kartu lokasi)
+  //  WIDGET KECIL
   // -------------------------------------------------------------------------
 
   Widget _tanggalField() {
@@ -498,10 +638,14 @@ class _SkriningPageState extends State<SkriningPage> {
                 size: 20, color: AppColors.textGrey),
             const SizedBox(width: 10),
             Text(
-              _formatTanggal(_tanggalLahir),
-              style: const TextStyle(
+              _tanggalLahir == null
+                  ? 'Pilih tanggal lahir'
+                  : _formatTanggal(_tanggalLahir!),
+              style: TextStyle(
                 fontSize: 13,
-                color: AppColors.textDark,
+                color: _tanggalLahir == null
+                    ? AppColors.textGrey
+                    : AppColors.textDark,
               ),
             ),
           ],
@@ -510,119 +654,6 @@ class _SkriningPageState extends State<SkriningPage> {
     );
   }
 
-  Widget _intensitasCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.outline),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '$_labelIntensitas (${_intensitas.toInt()}/10)',
-            style: const TextStyle(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textDark,
-            ),
-          ),
-          SliderTheme(
-            data: SliderTheme.of(context).copyWith(
-              trackHeight: 5,
-              activeTrackColor: _Sk.control,
-              inactiveTrackColor: _Sk.sliderInactive,
-              thumbColor: const Color(0xFFA96817),
-              overlayColor: const Color(0xFFC9822E).withValues(alpha: 0.15),
-              thumbShape:
-                  const RoundSliderThumbShape(enabledThumbRadius: 10),
-            ),
-            child: Slider(
-              value: _intensitas,
-              min: 0,
-              max: 10,
-              divisions: 10,
-              label: '${_intensitas.toInt()}',
-              onChanged: (v) => setState(() => _intensitas = v),
-            ),
-          ),
-          const Row(
-            children: [
-              _SkalaLabel('0'),
-              _SkalaLabel('2'),
-              _SkalaLabel('4'),
-              _SkalaLabel('6'),
-              _SkalaLabel('8'),
-              _SkalaLabel('10'),
-            ],
-          ),
-          const SizedBox(height: 2),
-          const Row(
-            children: [
-              Expanded(
-                child: Text('Ringan',
-                    textAlign: TextAlign.left,
-                    style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textGrey)),
-              ),
-              Expanded(
-                child: Text('Sedang',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textDark)),
-              ),
-              Expanded(
-                child: Text('Berat',
-                    textAlign: TextAlign.right,
-                    style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textGrey)),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _durasiField() {
-    return TextField(
-      controller: _durasiController,
-      keyboardType: TextInputType.number,
-      style: const TextStyle(fontSize: 13, color: AppColors.textDark),
-      decoration: InputDecoration(
-        hintText: 'Contoh: 4',
-        hintStyle: const TextStyle(fontSize: 13, color: AppColors.textGrey),
-        prefixIcon: const Icon(Icons.schedule_rounded,
-            size: 20, color: AppColors.textGrey),
-        suffixText: 'Jam',
-        suffixStyle:
-            const TextStyle(fontSize: 12.5, color: AppColors.textGrey),
-        filled: true,
-        fillColor: AppColors.surface,
-        contentPadding:
-            const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppColors.outline),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: _Sk.control, width: 1.4),
-        ),
-      ),
-    );
-  }
-
-  /// Baris radio custom (lingkaran amber, sesuai desain)
   Widget _radioRow(
       String label, int value, int? group, ValueChanged<int?> onChanged) {
     final selected = group == value;
@@ -655,8 +686,7 @@ class _SkriningPageState extends State<SkriningPage> {
                 label,
                 style: TextStyle(
                   fontSize: 13,
-                  fontWeight:
-                      selected ? FontWeight.w600 : FontWeight.w400,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
                   color: AppColors.textDark,
                 ),
               ),
@@ -667,7 +697,6 @@ class _SkriningPageState extends State<SkriningPage> {
     );
   }
 
-  /// Chip pilihan (Gejala & Pemicu)
   Widget _chip(String label, bool selected, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
@@ -692,7 +721,6 @@ class _SkriningPageState extends State<SkriningPage> {
     );
   }
 
-  /// Kartu lokasi nyeri (ilustrasi kepala + titik nyeri)
   Widget _lokasiCard(int index) {
     final item = _lokasiOpsi[index];
     final selected = _lokasi.contains(index);
@@ -734,7 +762,6 @@ class _SkriningPageState extends State<SkriningPage> {
 //  WIDGET PENDUKUNG
 // ===========================================================================
 
-/// Judul section + subjudul opsional
 class _SectionTitle extends StatelessWidget {
   const _SectionTitle(this.title, {this.subtitle});
 
@@ -769,25 +796,6 @@ class _SectionTitle extends StatelessWidget {
   }
 }
 
-/// Angka skala di bawah slider
-class _SkalaLabel extends StatelessWidget {
-  const _SkalaLabel(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Text(
-        text,
-        textAlign: TextAlign.center,
-        style: const TextStyle(fontSize: 10, color: AppColors.textGrey),
-      ),
-    );
-  }
-}
-
-/// Ilustrasi kepala dengan titik nyeri (digambar programatik — tanpa aset)
 class _PainFace extends StatelessWidget {
   const _PainFace({required this.lokasi});
 
@@ -807,7 +815,6 @@ class _PainFace extends StatelessWidget {
         child: Stack(
           children: [
             if (lokasi.full)
-              // Nyeri di seluruh kepala → gradasi merah menyeluruh
               Positioned.fill(
                 child: Container(
                   decoration: BoxDecoration(
@@ -823,7 +830,6 @@ class _PainFace extends StatelessWidget {
                 ),
               )
             else
-              // Titik nyeri pada posisi tertentu
               for (final spot in lokasi.spots)
                 Align(
                   alignment: spot,
