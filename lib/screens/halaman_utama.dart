@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'beranda.dart';
+import 'beranda.dart' hide AppColors;
 import 'konsultasi.dart';
 import 'skrining.dart';
 import '../theme.dart';

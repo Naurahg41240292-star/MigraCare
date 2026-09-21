@@ -4,12 +4,29 @@ import 'detail_artikel.dart';
 import 'skrining.dart';
 import 'pengingat_obat.dart';
 import '../models/obat.dart';
-import '../theme.dart';
+// Navigasi informasi layanan (fitur temanmu)
+import 'informasi_layanan.dart'
+    show InformasiLayananPage, Layanan, daftarLayanan;
+import 'detail_layanan.dart' show DetailLayananPage;
 
 /// ==========================================================================
-///  MIGRACARE — Halaman Beranda (v11 — merge pengingat obat + konsultasi)
+///  MIGRACARE — Halaman Beranda (v12 — merge final)
 ///  File: lib/screens/beranda.dart
 /// ==========================================================================
+
+/// Warna didefinisikan lokal (mandiri, tanpa theme.dart)
+/// agar tidak bentrok lagi dengan file lain.
+abstract class AppColors {
+  static const Color background = Color(0xFFFAF4EA);
+  static const Color surface = Colors.white;
+  static const Color primary = Color(0xFF6B4A2B);
+  static const Color darkBrown = Color(0xFF3D2B1A);
+  static const Color accent = Color(0xFFF2C230);
+  static const Color accentDark = Color(0xFFB07E1F);
+  static const Color textDark = Color(0xFF33261A);
+  static const Color textGrey = Color(0xFF9C948A);
+  static const Color outline = Color(0xFFEDE3D4);
+}
 
 void showAppSnack(BuildContext context, String message) {
   ScaffoldMessenger.of(context)
@@ -25,9 +42,9 @@ void showAppSnack(BuildContext context, String message) {
 }
 
 class BerandaPage extends StatefulWidget {
-  final VoidCallback? onBukaSkrining;
-
   const BerandaPage({super.key, this.onBukaSkrining});
+
+  final VoidCallback? onBukaSkrining;
 
   @override
   State<BerandaPage> createState() => _BerandaPageState();
@@ -44,7 +61,6 @@ class _BerandaPageState extends State<BerandaPage> {
       icon: Icons.local_hospital,
       imagePath:
           'https://images.unsplash.com/photo-1586773860418-d37222d8fce3?auto=format&fit=crop&w=600&q=60',
-      showDetailButton: true,
     ),
     _Service(
       name: 'RS. Jember Klinik',
@@ -67,6 +83,50 @@ class _BerandaPageState extends State<BerandaPage> {
           'https://images.unsplash.com/photo-1587854692152-cbe660dbde88?auto=format&fit=crop&w=600&q=60',
     ),
   ];
+
+  void _showSnack(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppColors.darkBrown,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+  }
+
+  /// Kalau beranda dibuka dari halaman_utama (dengan tab), pindah tab.
+  /// Kalau dibuka berdiri sendiri, push halaman skrining.
+  void _bukaSkrining() {
+    if (widget.onBukaSkrining != null) {
+      widget.onBukaSkrining!();
+    } else {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => SkriningPage()),
+      );
+    }
+  }
+
+  /// Klik kartu layanan di beranda:
+  /// push Informasi Layanan dulu (lapisan bawah), lalu Detail di atasnya,
+  /// sehingga "back" dari Detail mendarat di Informasi Layanan.
+  void _bukaDetailLayanan(_Service service) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const InformasiLayananPage()),
+    );
+    final match = daftarLayanan.where((l) => l.name == service.name).toList();
+    if (match.isNotEmpty) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => DetailLayananPage(layanan: match.first),
+        ),
+      );
+    }
+  }
 
   // ===== Navigasi ke halaman Pengingat Obat =====
   Future<void> _bukaPengingatObat() async {
@@ -211,22 +271,25 @@ class _BerandaPageState extends State<BerandaPage> {
               const SizedBox(height: 20),
               const _GreetingHeader(),
               const SizedBox(height: 20),
-              _AiMigraineBanner(onMulaiSkrining: widget.onBukaSkrining),
+              _AiMigraineBanner(onMulaiSkrining: _bukaSkrining),
               const SizedBox(height: 24),
               _SectionHeader(
                 title: 'Informasi Layanan',
-                onSeeAll: () => showAppSnack(
-                    context, 'Fitur Lihat Semua sedang dikembangkan'),
+                onSeeAll: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                        builder: (_) => const InformasiLayananPage()),
+                  );
+                },
               ),
               const SizedBox(height: 12),
-              const _ServiceList(services: _services),
+              _ServiceList(services: _services, onCardTap: _bukaDetailLayanan),
               const SizedBox(height: 24),
               _buildSectionPengingatObat(),
               const SizedBox(height: 24),
               _SectionHeader(
                 title: 'Artikel Populer',
-                onSeeAll: () => showAppSnack(
-                    context, 'Fitur Lihat Semua sedang dikembangkan'),
+                onSeeAll: () => _showSnack('Menuju halaman Artikel'),
               ),
               const SizedBox(height: 12),
               _ArticleList(articles: artikelPopuler),
@@ -262,8 +325,8 @@ class _GreetingHeader extends StatelessWidget {
                 ),
                 SizedBox(height: 4),
                 Text(
-                  // PENANDA VERSI v11 — kalau di layar muncul v11, berarti hasil merge sudah jalan!
-                  'Bagaimana Kondisi Anda hari ini?  •  v11',
+                  // PENANDA VERSI v12 — kalau muncul di layar, berarti merge final sudah jalan!
+                  'Bagaimana Kondisi Anda hari ini?  •  v12',
                   style: TextStyle(fontSize: 13, color: AppColors.textGrey),
                 ),
               ],
@@ -278,8 +341,7 @@ class _GreetingHeader extends StatelessWidget {
               border: Border.all(color: AppColors.outline),
             ),
             child: IconButton(
-              onPressed: () =>
-                  showAppSnack(context, 'Belum ada notifikasi baru'),
+              onPressed: () {},
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
               iconSize: 22,
@@ -295,9 +357,9 @@ class _GreetingHeader extends StatelessWidget {
 
 // ============================ BANNER AI ====================================
 class _AiMigraineBanner extends StatelessWidget {
-  const _AiMigraineBanner({this.onMulaiSkrining});
+  const _AiMigraineBanner({required this.onMulaiSkrining});
 
-  final VoidCallback? onMulaiSkrining;
+  final VoidCallback onMulaiSkrining;
 
   @override
   Widget build(BuildContext context) {
@@ -343,11 +405,7 @@ class _AiMigraineBanner extends StatelessWidget {
                   ),
                   const SizedBox(height: 14),
                   ElevatedButton(
-                    onPressed: onMulaiSkrining ??
-                        () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                  builder: (_) => SkriningPage()),
-                            ),
+                    onPressed: onMulaiSkrining,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFF7EAD0),
                       foregroundColor: AppColors.darkBrown,
@@ -439,9 +497,10 @@ class _SectionHeader extends StatelessWidget {
 
 // ============================ DAFTAR LAYANAN ===============================
 class _ServiceList extends StatelessWidget {
-  const _ServiceList({required this.services});
+  const _ServiceList({required this.services, required this.onCardTap});
 
   final List<_Service> services;
+  final ValueChanged<_Service> onCardTap;
 
   @override
   Widget build(BuildContext context) {
@@ -452,7 +511,10 @@ class _ServiceList extends StatelessWidget {
         children: [
           for (int i = 0; i < services.length; i++) ...[
             if (i > 0) const SizedBox(width: 12),
-            _ServiceCard(service: services[i]),
+            _ServiceCard(
+              service: services[i],
+              onTap: () => onCardTap(services[i]),
+            ),
           ],
         ],
       ),
@@ -461,113 +523,97 @@ class _ServiceList extends StatelessWidget {
 }
 
 class _ServiceCard extends StatelessWidget {
-  const _ServiceCard({required this.service});
+  const _ServiceCard({required this.service, required this.onTap});
 
   final _Service service;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 172,
-      height: 190,
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.outline),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x14A52A2A),
-            blurRadius: 10,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              height: 86,
-              width: double.infinity,
-              child: _SmartImage(path: service.imagePath, icon: service.icon),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      service.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textDark,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      '${service.distance} • ${service.location}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          fontSize: 9.5, color: AppColors.textGrey),
-                    ),
-                    const Spacer(),
-                    service.showDetailButton
-                        ? ElevatedButton(
-                            onPressed: () =>
-                                showAppSnack(context, 'Detail ${service.name}'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.accent,
-                              foregroundColor: AppColors.darkBrown,
-                              elevation: 0,
-                              minimumSize: const Size(0, 26),
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                            child: const Text(
-                              'Lihat Detail',
-                              style: TextStyle(
-                                  fontSize: 10, fontWeight: FontWeight.w700),
-                            ),
-                          )
-                        : Row(
-                            children: [
-                              const Icon(
-                                Icons.star_rounded,
-                                size: 14,
-                                color: Color(0xFFF2B01E),
-                              ),
-                              const SizedBox(width: 3),
-                              Text(
-                                '${service.rating}',
-                                style: const TextStyle(
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.textDark,
-                                ),
-                              ),
-                              Text(
-                                '  (${service.reviews} ulasan)',
-                                style: const TextStyle(
-                                  fontSize: 9.5,
-                                  color: AppColors.textGrey,
-                                ),
-                              ),
-                            ],
-                          ),
-                  ],
-                ),
-              ),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 180,
+        height: 195,
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.outline),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x14A52A2A),
+              blurRadius: 10,
+              offset: Offset(0, 4),
             ),
           ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                height: 84,
+                width: double.infinity,
+                child:
+                    _SmartImage(path: service.imagePath, icon: service.icon),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        service.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textDark,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${service.distance} • ${service.location}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 11, color: AppColors.textGrey),
+                      ),
+                      const Spacer(),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.star_rounded,
+                            size: 17,
+                            color: Color(0xFFF2B01E),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${service.rating}',
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textDark,
+                            ),
+                          ),
+                          Text(
+                            '  (${service.reviews} ulasan)',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppColors.textGrey,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -751,7 +797,6 @@ class _Service {
     required this.reviews,
     required this.icon,
     required this.imagePath,
-    this.showDetailButton = false,
   });
 
   final String name;
@@ -761,5 +806,4 @@ class _Service {
   final int reviews;
   final IconData icon;
   final String imagePath;
-  final bool showDetailButton;
 }
