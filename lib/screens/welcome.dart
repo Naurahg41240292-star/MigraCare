@@ -10,21 +10,6 @@ import 'daftar.dart';
 class WelcomePage extends StatelessWidget {
   const WelcomePage({super.key});
 
-  void _showSnack(BuildContext context, String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: _Wc.textDark,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(

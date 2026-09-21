@@ -108,7 +108,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                           data.title,
                           textAlign: TextAlign.center,
                           style: const TextStyle(
-                            fontSize: 30,
+                            fontSize: 26,
                             fontWeight: FontWeight.w800,
                             color: _Ob.textDark,
                           ),
@@ -118,8 +118,8 @@ class _OnboardingPageState extends State<OnboardingPage> {
                           data.description,
                           textAlign: TextAlign.center,
                           style: const TextStyle(
-                            fontSize: 20,
-                            height: 1.7,
+                            fontSize: 17,
+                            height: 1.6,
                             fontWeight: FontWeight.w500,
                             color: _Ob.textGrey,
                           ),

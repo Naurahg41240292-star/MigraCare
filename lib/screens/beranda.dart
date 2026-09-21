@@ -4,23 +4,12 @@ import 'detail_artikel.dart';
 import 'skrining.dart';
 import 'pengingat_obat.dart';
 import '../models/obat.dart';
+import '../theme.dart';
 
 /// ==========================================================================
-///  MIGRACARE — Halaman Beranda (v10)
+///  MIGRACARE — Halaman Beranda (v11 — merge pengingat obat + konsultasi)
 ///  File: lib/screens/beranda.dart
 /// ==========================================================================
-
-abstract class AppColors {
-  static const Color background = Color(0xFFFAF4EA);
-  static const Color surface = Colors.white;
-  static const Color primary = Color(0xFF6B4A2B);
-  static const Color darkBrown = Color(0xFF3D2B1A);
-  static const Color accent = Color(0xFFF2C230);
-  static const Color accentDark = Color(0xFFB07E1F);
-  static const Color textDark = Color(0xFF33261A);
-  static const Color textGrey = Color(0xFF9C948A);
-  static const Color outline = Color(0xFFEDE3D4);
-}
 
 void showAppSnack(BuildContext context, String message) {
   ScaffoldMessenger.of(context)
@@ -36,15 +25,15 @@ void showAppSnack(BuildContext context, String message) {
 }
 
 class BerandaPage extends StatefulWidget {
-  const BerandaPage({super.key});
+  final VoidCallback? onBukaSkrining;
+
+  const BerandaPage({super.key, this.onBukaSkrining});
 
   @override
   State<BerandaPage> createState() => _BerandaPageState();
 }
 
 class _BerandaPageState extends State<BerandaPage> {
-  int _navIndex = 0;
-
   static const List<_Service> _services = [
     _Service(
       name: 'RS AL Huda Banyuwangi',
@@ -78,27 +67,6 @@ class _BerandaPageState extends State<BerandaPage> {
           'https://images.unsplash.com/photo-1587854692152-cbe660dbde88?auto=format&fit=crop&w=600&q=60',
     ),
   ];
-
-  void _handleNavTap(int index) {
-    switch (index) {
-      case 1:
-        Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => SkriningPage()),
-        );
-        break;
-      case 2:
-        showAppSnack(context, 'Halaman Konsultasi sedang dikembangkan');
-        break;
-      case 3:
-        showAppSnack(context, 'Halaman Riwayat sedang dikembangkan');
-        break;
-      case 4:
-        showAppSnack(context, 'Halaman Profil sedang dikembangkan');
-        break;
-      default:
-        setState(() => _navIndex = index);
-    }
-  }
 
   // ===== Navigasi ke halaman Pengingat Obat =====
   Future<void> _bukaPengingatObat() async {
@@ -243,7 +211,7 @@ class _BerandaPageState extends State<BerandaPage> {
               const SizedBox(height: 20),
               const _GreetingHeader(),
               const SizedBox(height: 20),
-              const _AiMigraineBanner(),
+              _AiMigraineBanner(onMulaiSkrining: widget.onBukaSkrining),
               const SizedBox(height: 24),
               _SectionHeader(
                 title: 'Informasi Layanan',
@@ -261,14 +229,10 @@ class _BerandaPageState extends State<BerandaPage> {
                     context, 'Fitur Lihat Semua sedang dikembangkan'),
               ),
               const SizedBox(height: 12),
-             _ArticleList(articles: artikelPopuler)
+              _ArticleList(articles: artikelPopuler),
             ],
           ),
         ),
-      ),
-      bottomNavigationBar: _BottomNavBar(
-        currentIndex: _navIndex,
-        onTap: _handleNavTap,
       ),
     );
   }
@@ -298,8 +262,8 @@ class _GreetingHeader extends StatelessWidget {
                 ),
                 SizedBox(height: 4),
                 Text(
-                  // PENANDA VERSI v10 — kalau di layar sudah v10, berarti build terbaru jalan!
-                  'Bagaimana Kondisi Anda hari ini?  •  v10',
+                  // PENANDA VERSI v11 — kalau di layar muncul v11, berarti hasil merge sudah jalan!
+                  'Bagaimana Kondisi Anda hari ini?  •  v11',
                   style: TextStyle(fontSize: 13, color: AppColors.textGrey),
                 ),
               ],
@@ -331,7 +295,9 @@ class _GreetingHeader extends StatelessWidget {
 
 // ============================ BANNER AI ====================================
 class _AiMigraineBanner extends StatelessWidget {
-  const _AiMigraineBanner();
+  const _AiMigraineBanner({this.onMulaiSkrining});
+
+  final VoidCallback? onMulaiSkrining;
 
   @override
   Widget build(BuildContext context) {
@@ -377,11 +343,11 @@ class _AiMigraineBanner extends StatelessWidget {
                   ),
                   const SizedBox(height: 14),
                   ElevatedButton(
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => SkriningPage()),
-                      );
-                    },
+                    onPressed: onMulaiSkrining ??
+                        () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                  builder: (_) => SkriningPage()),
+                            ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFF7EAD0),
                       foregroundColor: AppColors.darkBrown,
@@ -553,8 +519,8 @@ class _ServiceCard extends StatelessWidget {
                     const Spacer(),
                     service.showDetailButton
                         ? ElevatedButton(
-                            onPressed: () => showAppSnack(
-                                context, 'Detail ${service.name}'),
+                            onPressed: () =>
+                                showAppSnack(context, 'Detail ${service.name}'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.accent,
                               foregroundColor: AppColors.darkBrown,
@@ -569,8 +535,7 @@ class _ServiceCard extends StatelessWidget {
                             child: const Text(
                               'Lihat Detail',
                               style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700),
+                                  fontSize: 10, fontWeight: FontWeight.w700),
                             ),
                           )
                         : Row(
@@ -719,55 +684,6 @@ class _ArticleCard extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-// ============================ BOTTOM NAV ===================================
-class _BottomNavBar extends StatelessWidget {
-  const _BottomNavBar({required this.currentIndex, required this.onTap});
-
-  final int currentIndex;
-  final ValueChanged<int> onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return BottomNavigationBar(
-      currentIndex: currentIndex,
-      onTap: onTap,
-      type: BottomNavigationBarType.fixed,
-      backgroundColor: Colors.white,
-      selectedItemColor: AppColors.accentDark,
-      unselectedItemColor: const Color(0xFFB9B2A8),
-      selectedFontSize: 11.5,
-      unselectedFontSize: 11.5,
-      elevation: 8,
-      items: const [
-        BottomNavigationBarItem(
-          icon: Icon(Icons.home_outlined),
-          activeIcon: Icon(Icons.home_rounded),
-          label: 'Beranda',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.fact_check_outlined),
-          activeIcon: Icon(Icons.fact_check_rounded),
-          label: 'Skrining',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.chat_bubble_outline_rounded),
-          activeIcon: Icon(Icons.chat_bubble_rounded),
-          label: 'Konsultasi',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.history_rounded),
-          label: 'Riwayat',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.person_outline_rounded),
-          activeIcon: Icon(Icons.person_rounded),
-          label: 'Profil',
-        ),
-      ],
     );
   }
 }

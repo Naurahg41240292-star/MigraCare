@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'beranda.dart';
+
+import '../theme.dart';
 
 /// ==========================================================================
 ///  MIGRACARE — Halaman Skrining (Migraine Monitor)
@@ -180,8 +181,8 @@ class _SkriningPageState extends State<SkriningPage> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   _recap('Tanggal Lahir', _formatTanggal(_tanggalLahir)),
-                  _recap(
-                      'Intensitas', '${_labelIntensitas} (${_intensitas.toInt()}/10)'),
+                  _recap('Intensitas',
+                      '$_labelIntensitas (${_intensitas.toInt()}/10)'),
                   _recap('Durasi', durasi.isEmpty ? '-' : '$durasi jam'),
                   _recap('Frekuensi', _frekuensiOpsi[_frekuensi!]),
                   _recap('Karakter', _karakterOpsi[_karakter!]),
@@ -471,50 +472,7 @@ class _SkriningPageState extends State<SkriningPage> {
           ),
         ),
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: 1,
-        onTap: (index) {
-          const labels = ['Beranda', 'Skrining', 'Riwayat', 'Pengingat', 'Profil'];
-          if (index == 0) {
-            Navigator.of(context).pop();
-          } else if (index != 1) {
-            _showSnack('Halaman ${labels[index]} belum tersedia');
-          }
-        },
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: Colors.white,
-        selectedItemColor: AppColors.accentDark,
-        unselectedItemColor: const Color(0xFFB9B2A8),
-        selectedFontSize: 11.5,
-        unselectedFontSize: 11.5,
-        elevation: 12,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            activeIcon: Icon(Icons.home_rounded),
-            label: 'Beranda',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.fact_check_outlined),
-            activeIcon: Icon(Icons.fact_check_rounded),
-            label: 'Skrining',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.history_rounded),
-            label: 'Riwayat',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.medication_outlined),
-            activeIcon: Icon(Icons.medication_rounded),
-            label: 'Pengingat',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline_rounded),
-            activeIcon: Icon(Icons.person_rounded),
-            label: 'Profil',
-          ),
-        ],
-      ),
+      // CATATAN: bottom nav TIDAK ADA di sini — nav dipasang di HalamanUtama.
     );
   }
 
@@ -565,7 +523,7 @@ class _SkriningPageState extends State<SkriningPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '${_labelIntensitas} (${_intensitas.toInt()}/10)',
+            '$_labelIntensitas (${_intensitas.toInt()}/10)',
             style: const TextStyle(
               fontSize: 12.5,
               fontWeight: FontWeight.w700,
@@ -578,7 +536,7 @@ class _SkriningPageState extends State<SkriningPage> {
               activeTrackColor: _Sk.control,
               inactiveTrackColor: _Sk.sliderInactive,
               thumbColor: const Color(0xFFA96817),
-              overlayColor: const Color(0xFFC9822E).withOpacity(0.15),
+              overlayColor: const Color(0xFFC9822E).withValues(alpha: 0.15),
               thumbShape:
                   const RoundSliderThumbShape(enabledThumbRadius: 10),
             ),
@@ -591,8 +549,8 @@ class _SkriningPageState extends State<SkriningPage> {
               onChanged: (v) => setState(() => _intensitas = v),
             ),
           ),
-          Row(
-            children: const [
+          const Row(
+            children: [
               _SkalaLabel('0'),
               _SkalaLabel('2'),
               _SkalaLabel('4'),
@@ -683,8 +641,7 @@ class _SkriningPageState extends State<SkriningPage> {
                 shape: BoxShape.circle,
                 color: selected ? _Sk.control : Colors.transparent,
                 border: Border.all(
-                  color:
-                      selected ? _Sk.control : const Color(0xFFC9BFB0),
+                  color: selected ? _Sk.control : const Color(0xFFC9BFB0),
                   width: 1.8,
                 ),
               ),
@@ -850,7 +807,7 @@ class _PainFace extends StatelessWidget {
         child: Stack(
           children: [
             if (lokasi.full)
-              // Neri di seluruh kepala → gradasi merah menyeluruh
+              // Nyeri di seluruh kepala → gradasi merah menyeluruh
               Positioned.fill(
                 child: Container(
                   decoration: BoxDecoration(
@@ -858,8 +815,8 @@ class _PainFace extends StatelessWidget {
                     gradient: RadialGradient(
                       radius: 1.1,
                       colors: [
-                        _Sk.pain.withOpacity(0.85),
-                        _Sk.pain.withOpacity(0.25),
+                        _Sk.pain.withValues(alpha: 0.85),
+                        _Sk.pain.withValues(alpha: 0.25),
                       ],
                     ),
                   ),
@@ -877,8 +834,8 @@ class _PainFace extends StatelessWidget {
                       shape: BoxShape.circle,
                       gradient: RadialGradient(
                         colors: [
-                          _Sk.pain.withOpacity(0.9),
-                          _Sk.pain.withOpacity(0.0),
+                          _Sk.pain.withValues(alpha: 0.9),
+                          _Sk.pain.withValues(alpha: 0.0),
                         ],
                       ),
                     ),
