@@ -2,36 +2,39 @@ import 'package:flutter/material.dart';
 import '../models/artikel.dart';
 import 'detail_artikel.dart';
 import 'skrining.dart';
-import '../theme.dart';
+// HANYA ambil yang dibutuhkan → tidak mungkin bentrok AppColors lagi
+import 'informasi_layanan.dart'
+    show InformasiLayananPage, Layanan, daftarLayanan;
+import 'detail_layanan.dart' show DetailLayananPage;
 
 /// ==========================================================================
-///  MIGRACARE — Halaman Beranda (v9)
+///  MIGRACARE — Halaman Beranda (v10 — mandiri, tanpa theme.dart)
 ///  File: lib/screens/beranda.dart
 /// ==========================================================================
 
-void showAppSnack(BuildContext context, String message) {
-  ScaffoldMessenger.of(context)
-    ..hideCurrentSnackBar()
-    ..showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: AppColors.darkBrown,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-    );
+abstract class AppColors {
+  static const Color background = Color(0xFFFAF4EA);
+  static const Color surface = Colors.white;
+  static const Color primary = Color(0xFF6B4A2B);
+  static const Color darkBrown = Color(0xFF3D2B1A);
+  static const Color accent = Color(0xFFF2C230);
+  static const Color accentDark = Color(0xFFB07E1F);
+  static const Color textDark = Color(0xFF33261A);
+  static const Color textGrey = Color(0xFF9C948A);
+  static const Color outline = Color(0xFFEDE3D4);
 }
 
 class BerandaPage extends StatefulWidget {
-  final VoidCallback? onBukaSkrining;
-
   const BerandaPage({super.key, this.onBukaSkrining});
+
+  final VoidCallback? onBukaSkrining;
 
   @override
   State<BerandaPage> createState() => _BerandaPageState();
 }
 
 class _BerandaPageState extends State<BerandaPage> {
+  int _navIndex = 0;
 
   static const List<_Service> _services = [
     _Service(
@@ -43,7 +46,6 @@ class _BerandaPageState extends State<BerandaPage> {
       icon: Icons.local_hospital,
       imagePath:
           'https://images.unsplash.com/photo-1586773860418-d37222d8fce3?auto=format&fit=crop&w=600&q=60',
-      showDetailButton: true,
     ),
     _Service(
       name: 'RS. Jember Klinik',
@@ -67,6 +69,69 @@ class _BerandaPageState extends State<BerandaPage> {
     ),
   ];
 
+  void _showSnack(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppColors.darkBrown,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+  }
+/// Kalau beranda dibuka dari halaman_utama (dengan tab), pindah tab.
+/// Kalau dibuka berdiri sendiri, push halaman skrining.
+void _bukaSkrining() {
+  if (widget.onBukaSkrining != null) {
+    widget.onBukaSkrining!();
+  } else {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => SkriningPage()),
+    );
+  }
+}
+
+  void _handleNavTap(int index) {
+  switch (index) {
+    case 1:
+      _bukaSkrining();
+      break;
+      case 2:
+        _showSnack('Halaman Konsultasi sedang dikembangkan');
+        break;
+      case 3:
+        _showSnack('Halaman Riwayat sedang dikembangkan');
+        break;
+      case 4:
+        _showSnack('Halaman Profil sedang dikembangkan');
+        break;
+      default:
+        setState(() => _navIndex = index);
+    }
+  }
+
+  /// Klik kartu layanan di beranda:
+  /// push Informasi Layanan dulu (lapisan bawah), lalu Detail di atasnya,
+  /// sehingga "back" dari Detail mendarat di Informasi Layanan.
+  void _bukaDetailLayanan(_Service service) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const InformasiLayananPage()),
+    );
+    final match =
+        daftarLayanan.where((l) => l.name == service.name).toList();
+    if (match.isNotEmpty) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => DetailLayananPage(layanan: match.first),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -80,15 +145,20 @@ class _BerandaPageState extends State<BerandaPage> {
               const SizedBox(height: 8),
               const _GreetingHeader(),
               const SizedBox(height: 20),
-              _AiMigraineBanner(onMulaiSkrining: widget.onBukaSkrining),
+              _AiMigraineBanner(onMulaiSkrining: _bukaSkrining),
               const SizedBox(height: 24),
               _SectionHeader(
                 title: 'Informasi Layanan',
-                onSeeAll: () =>
-                    showAppSnack(context, 'Menuju halaman Informasi Layanan'),
+                onSeeAll: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                        builder: (_) => const InformasiLayananPage()),
+                  );
+                },
               ),
               const SizedBox(height: 12),
-              _ServiceList(services: _services),
+              _ServiceList(
+                  services: _services, onCardTap: _bukaDetailLayanan),
               const SizedBox(height: 24),
               const _SectionHeader(title: 'Pengingat Obat'),
               const SizedBox(height: 12),
@@ -100,7 +170,8 @@ class _BerandaPageState extends State<BerandaPage> {
               const SizedBox(height: 24),
               _SectionHeader(
                 title: 'Artikel Populer',
-                onSeeAll: () => showAppSnack(context, 'Menuju halaman Artikel'),
+                onSeeAll: () =>
+                    _showSnack('Menuju halaman Artikel'),
               ),
               const SizedBox(height: 12),
               const _ArticleList(articles: artikelPopuler),
@@ -109,7 +180,6 @@ class _BerandaPageState extends State<BerandaPage> {
           ),
         ),
       ),
-
     );
   }
 }
@@ -138,8 +208,8 @@ class _GreetingHeader extends StatelessWidget {
                 ),
                 SizedBox(height: 4),
                 Text(
-                  // PENANDA VERSI v9 — hapus setelah semua beres!
-                  'Bagaimana Kondisi Anda hari ini?  •  v9',
+                  // Penanda versi — hapus "• v10" setelah semua beres
+                  'Bagaimana Kondisi Anda hari ini?  •  v10',
                   style: TextStyle(fontSize: 13, color: AppColors.textGrey),
                 ),
               ],
@@ -154,8 +224,7 @@ class _GreetingHeader extends StatelessWidget {
               border: Border.all(color: AppColors.outline),
             ),
             child: IconButton(
-              onPressed: () =>
-                  showAppSnack(context, 'Belum ada notifikasi baru'),
+              onPressed: () {},
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
               iconSize: 22,
@@ -171,9 +240,9 @@ class _GreetingHeader extends StatelessWidget {
 
 // ============================ BANNER AI ====================================
 class _AiMigraineBanner extends StatelessWidget {
-  const _AiMigraineBanner({this.onMulaiSkrining});
+  const _AiMigraineBanner({required this.onMulaiSkrining});
 
-   final VoidCallback? onMulaiSkrining;
+  final VoidCallback onMulaiSkrining;
 
   @override
   Widget build(BuildContext context) {
@@ -219,10 +288,7 @@ class _AiMigraineBanner extends StatelessWidget {
                   ),
                   const SizedBox(height: 14),
                   ElevatedButton(
-                    onPressed: onMulaiSkrining ??
-                    () => Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => SkriningPage()),
-                        ),
+                    onPressed: onMulaiSkrining,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFF7EAD0),
                       foregroundColor: AppColors.darkBrown,
@@ -314,9 +380,10 @@ class _SectionHeader extends StatelessWidget {
 
 // ============================ DAFTAR LAYANAN ===============================
 class _ServiceList extends StatelessWidget {
-  const _ServiceList({required this.services});
+  const _ServiceList({required this.services, required this.onCardTap});
 
   final List<_Service> services;
+  final ValueChanged<_Service> onCardTap;
 
   @override
   Widget build(BuildContext context) {
@@ -327,7 +394,10 @@ class _ServiceList extends StatelessWidget {
         children: [
           for (int i = 0; i < services.length; i++) ...[
             if (i > 0) const SizedBox(width: 12),
-            _ServiceCard(service: services[i]),
+            _ServiceCard(
+              service: services[i],
+              onTap: () => onCardTap(services[i]),
+            ),
           ],
         ],
       ),
@@ -336,114 +406,97 @@ class _ServiceList extends StatelessWidget {
 }
 
 class _ServiceCard extends StatelessWidget {
-  const _ServiceCard({required this.service});
+  const _ServiceCard({required this.service, required this.onTap});
 
   final _Service service;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 172,
-      height: 190,
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.outline),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x14A52A2A),
-            blurRadius: 10,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              height: 86,
-              width: double.infinity,
-              child: _SmartImage(path: service.imagePath, icon: service.icon),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      service.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textDark,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      '${service.distance} • ${service.location}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          fontSize: 9.5, color: AppColors.textGrey),
-                    ),
-                    const Spacer(),
-                    service.showDetailButton
-                        ? ElevatedButton(
-                            onPressed: () => showAppSnack(
-                                context, 'Detail ${service.name}'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.accent,
-                              foregroundColor: AppColors.darkBrown,
-                              elevation: 0,
-                              minimumSize: const Size(0, 26),
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                            child: const Text(
-                              'Lihat Detail',
-                              style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700),
-                            ),
-                          )
-                        : Row(
-                            children: [
-                              const Icon(
-                                Icons.star_rounded,
-                                size: 14,
-                                color: Color(0xFFF2B01E),
-                              ),
-                              const SizedBox(width: 3),
-                              Text(
-                                '${service.rating}',
-                                style: const TextStyle(
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.textDark,
-                                ),
-                              ),
-                              Text(
-                                '  (${service.reviews} ulasan)',
-                                style: const TextStyle(
-                                  fontSize: 9.5,
-                                  color: AppColors.textGrey,
-                                ),
-                              ),
-                            ],
-                          ),
-                  ],
-                ),
-              ),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 180,
+        height: 195,
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.outline),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x14A52A2A),
+              blurRadius: 10,
+              offset: Offset(0, 4),
             ),
           ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                height: 84,
+                width: double.infinity,
+                child:
+                    _SmartImage(path: service.imagePath, icon: service.icon),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        service.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textDark,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${service.distance} • ${service.location}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 11, color: AppColors.textGrey),
+                      ),
+                      const Spacer(),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.star_rounded,
+                            size: 17,
+                            color: Color(0xFFF2B01E),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${service.rating}',
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textDark,
+                            ),
+                          ),
+                          Text(
+                            '  (${service.reviews} ulasan)',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppColors.textGrey,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -520,8 +573,8 @@ class _MedicationReminderCardState extends State<_MedicationReminderCard> {
                   const SizedBox(height: 2),
                   Text(
                     widget.dosage,
-                    style:
-                        const TextStyle(fontSize: 11, color: AppColors.textGrey),
+                    style: const TextStyle(
+                        fontSize: 11, color: AppColors.textGrey),
                   ),
                 ],
               ),
@@ -669,6 +722,55 @@ class _ArticleCard extends StatelessWidget {
   }
 }
 
+// ============================ BOTTOM NAV ===================================
+class _BottomNavBar extends StatelessWidget {
+  const _BottomNavBar({required this.currentIndex, required this.onTap});
+
+  final int currentIndex;
+  final ValueChanged<int> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return BottomNavigationBar(
+      currentIndex: currentIndex,
+      onTap: onTap,
+      type: BottomNavigationBarType.fixed,
+      backgroundColor: Colors.white,
+      selectedItemColor: AppColors.accentDark,
+      unselectedItemColor: const Color(0xFFB9B2A8),
+      selectedFontSize: 11.5,
+      unselectedFontSize: 11.5,
+      elevation: 8,
+      items: const [
+        BottomNavigationBarItem(
+          icon: Icon(Icons.home_outlined),
+          activeIcon: Icon(Icons.home_rounded),
+          label: 'Beranda',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.fact_check_outlined),
+          activeIcon: Icon(Icons.fact_check_rounded),
+          label: 'Skrining',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.chat_bubble_outline_rounded),
+          activeIcon: Icon(Icons.chat_bubble_rounded),
+          label: 'Konsultasi',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.history_rounded),
+          label: 'Riwayat',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.person_outline_rounded),
+          activeIcon: Icon(Icons.person_rounded),
+          label: 'Profil',
+        ),
+      ],
+    );
+  }
+}
+
 // ============================ HELPER & MODEL ===============================
 class _SmartImage extends StatelessWidget {
   const _SmartImage({required this.path, required this.icon});
@@ -732,7 +834,6 @@ class _Service {
     required this.reviews,
     required this.icon,
     required this.imagePath,
-    this.showDetailButton = false,
   });
 
   final String name;
@@ -742,5 +843,4 @@ class _Service {
   final int reviews;
   final IconData icon;
   final String imagePath;
-  final bool showDetailButton;
 }
