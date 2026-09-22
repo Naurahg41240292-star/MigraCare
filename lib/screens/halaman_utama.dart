@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'beranda.dart' hide AppColors;
 import 'konsultasi.dart';
 import 'skrining.dart';
+import 'riwayat.dart';
 import '../theme.dart';
 
 /// Shell utama — SATU-SATUNYA pemilik bottom nav.
@@ -25,9 +26,9 @@ class _HalamanUtamaState extends State<HalamanUtama> {
         index: _index,
         children: [
           BerandaPage(onBukaSkrining: () => _pindahTab(1)),
-          const SkriningPage(),
+          SkriningPage(onSelesai: () => _pindahTab(3)),
           KonsultasiScreen(),
-          const _Placeholder('Riwayat'),
+          RiwayatPage(onBukaSkrining: () => _pindahTab(1)),
           const _Placeholder('Profil'),
         ],
       ),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme.dart';
 import '../services/screening_service.dart';
 import 'hasil_analisis.dart';
+import '../services/riwayat_service.dart';
 
 /// ==========================================================================
 ///  MIGRACARE — Halaman Skrining (Migraine Monitor)
@@ -25,7 +26,9 @@ class _Lokasi {
 }
 
 class SkriningPage extends StatefulWidget {
-  const SkriningPage({super.key});
+  const SkriningPage({super.key, this.onSelesai});
+
+  final VoidCallback? onSelesai;
 
   @override
   State<SkriningPage> createState() => _SkriningPageState();
@@ -50,6 +53,23 @@ class _SkriningPageState extends State<SkriningPage> {
   void initState() {
     super.initState();
     ScreeningService.instance.ensureLoaded();
+  }
+
+  void _resetForm() {
+    setState(() {
+      _tanggalLahir = null;
+      _intensitas = null;
+      _durasi = null;
+      _frekuensi = null;
+      _karakter = null;
+      _lokasi.clear();
+      _gejala.clear();
+      _visualAura.clear();
+      _sensory = null;
+      _neuro.clear();
+      _pemicu.clear();
+      _riwayatKeluarga = null;
+    });
   }
 
   // ------------------------------ DATA OPSI -------------------------------
@@ -216,7 +236,7 @@ class _SkriningPageState extends State<SkriningPage> {
 
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (dialogContext) {
         return AlertDialog(
           backgroundColor: AppColors.surface,
           shape: RoundedRectangleBorder(
@@ -238,7 +258,7 @@ class _SkriningPageState extends State<SkriningPage> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   _recap('Tanggal Lahir',
-                      '${_formatTanggal(_tanggalLahir!)} (${_umur} th)'),
+                      '${_formatTanggal(_tanggalLahir!)} ($_umur th)'),
                   _recap('Intensitas', _labelIntensitas),
                   _recap('Durasi', _durasiOpsi[_durasi!]),
                   _recap('Frekuensi', '${_frekuensiOpsi[_frekuensi!]} / minggu'),
@@ -263,7 +283,7 @@ class _SkriningPageState extends State<SkriningPage> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: () => Navigator.of(dialogContext).pop(),
               child: const Text(
                 'Perbaiki',
                 style: TextStyle(color: AppColors.textGrey),
@@ -271,20 +291,55 @@ class _SkriningPageState extends State<SkriningPage> {
             ),
             ElevatedButton(
               onPressed: () async {
-                Navigator.of(context).pop();
+                Navigator.of(dialogContext).pop();
 
                 try {
                   await ScreeningService.instance.ensureLoaded();
 
-                  final result =
-                      ScreeningService.instance.predict(buildFeatureVector());
+                  final fitur = buildFeatureVector();
+                  final result = ScreeningService.instance.predict(fitur);
+
+                  final riwayatBaru = RiwayatItem(
+                    waktu: DateTime.now(),
+                    hasil: result.label,
+                    confidence: result.confidence,
+                    intensitas: _labelIntensitas,
+                    fitur: fitur,
+                    probabilities: {
+                      for (final p in result.probabilities) p.key: p.value,
+                    },
+                    detailJawaban: {
+                      'umur': _umur,
+                      'tanggalLahir': _formatTanggal(_tanggalLahir!),
+                      'intensitas': _labelIntensitas,
+                      'durasi': _durasiOpsi[_durasi!],
+                      'frekuensi': '${_frekuensiOpsi[_frekuensi!]} / minggu',
+                      'karakter': _karakterOpsi[_karakter!],
+                      'lokasi': lokasiLabel,
+                      'gejala': _gejala.toList(),
+                      'visualAura': _visualAura.toList(),
+                      'sensory': _sensoryOpsi[_sensory!],
+                      'pemicu': _pemicu.toList(),
+                      'neuro': _neuro.map((i) => _neuroOpsi[i]).toList(),
+                      'riwayatKeluarga': _riwayatKeluarga == 1 ? 'Ya' : 'Tidak',
+                    },
+                  );
+
+                  // Simpan ke riwayat persisten
+                  await RiwayatService.instance.tambah(riwayatBaru);
+
                   if (!mounted) return;
-                  Navigator.push(
+                  final selesai = await Navigator.push<bool>(
                     context,
                     MaterialPageRoute(
                       builder: (_) => HasilAnalisisPage(result: result),
                     ),
                   );
+
+                  if (selesai == true && mounted) {
+                    _resetForm();
+                    widget.onSelesai?.call();
+                  }
                 } catch (e) {
                   if (!mounted) return;
                   _showSnack('ERROR: $e');
