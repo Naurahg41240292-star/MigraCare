@@ -2,6 +2,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import '../models/profil_pengguna.dart';
 import 'edit_profil.dart';
+import 'pengaturan_notifikasi.dart' hide AppColors;
+import 'tentang.dart' hide AppColors;
 
 /// ==========================================================================
 ///  MIGRACARE — Halaman Profil
@@ -28,6 +30,8 @@ class ProfilPage extends StatefulWidget {
 }
 
 class _ProfilPageState extends State<ProfilPage> {
+    String _tema = 'Terang';
+    String _bahasa = 'Bahasa Indonesia';
   void _showSnack(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -91,6 +95,91 @@ class _ProfilPageState extends State<ProfilPage> {
       // Nanti bisa diarahkan ke halaman Masuk di sini.
     }
   }
+
+  Future<void> _pilihTema() async {
+  final pilih = await showModalBottomSheet<String>(
+    context: context,
+    backgroundColor: AppColors.surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (context) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Pilih Tema',
+              style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textDark),
+            ),
+            const SizedBox(height: 8),
+            ...['Terang', 'Gelap', 'Sistem'].map(
+              (t) => RadioListTile<String>(
+                value: t,
+                groupValue: _tema,
+                activeColor: AppColors.accentDark,
+                title: Text(t,
+                    style: const TextStyle(
+                        fontSize: 13.5, color: AppColors.textDark)),
+                onChanged: (v) => Navigator.pop(context, v),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+  if (pilih != null) setState(() => _tema = pilih);
+}
+
+Future<void> _pilihBahasa() async {
+  final pilih = await showModalBottomSheet<String>(
+    context: context,
+    backgroundColor: AppColors.surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (context) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Pilih Bahasa',
+              style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textDark),
+            ),
+            const SizedBox(height: 8),
+            RadioListTile<String>(
+              value: 'Bahasa Indonesia',
+              groupValue: _bahasa,
+              activeColor: AppColors.accentDark,
+              title: const Text('Bahasa Indonesia',
+                  style: TextStyle(
+                      fontSize: 13.5, color: AppColors.textDark)),
+              onChanged: (v) => Navigator.pop(context, v),
+            ),
+            const ListTile(
+              enabled: false,
+              title: Text('English (segera hadir)',
+                  style: TextStyle(fontSize: 13.5)),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+  if (pilih != null) setState(() => _bahasa = pilih);
+}
 
   @override
   Widget build(BuildContext context) {
@@ -209,13 +298,18 @@ class _ProfilPageState extends State<ProfilPage> {
                 ),
               ),
               const SizedBox(height: 10),
-              _MenuSetting(
-                icon: Icons.notifications_rounded,
-                iconBg: const Color(0xFFFDF3D7),
-                iconColor: const Color(0xFFC99A2C),
-                judul: 'Notifikasi',
-                sub: 'Kelola pengingat dan notifikasi penting',
-                onTap: () => _showSnack('Pengaturan Notifikasi (segera)'),
+             _MenuSetting(
+               icon: Icons.notifications_rounded,
+               iconBg: const Color(0xFFFDF3D7),
+               iconColor: const Color(0xFFC99A2C),
+               judul: 'Notifikasi',
+               sub: 'Kelola pengingat dan notifikasi penting',
+               onTap: () {
+                    Navigator.of(context).push(                               // benar-benar buka halaman
+                       MaterialPageRoute(
+                            builder: (_) => const PengaturanNotifikasiPage()),
+                    );
+                },
               ),
               _MenuSetting(
                 icon: Icons.grid_view_rounded,
@@ -223,17 +317,18 @@ class _ProfilPageState extends State<ProfilPage> {
                 iconColor: const Color(0xFFC99A2C),
                 judul: 'Tema',
                 sub: 'Pilih tampilan aplikasi MigraCare',
-                onTap: () => _showSnack('Pengaturan Tema (segera)'),
-              ),
-              _MenuSetting(
+                nilai: _tema,
+                onTap: _pilihTema,
+               ),
+             _MenuSetting(
                 icon: Icons.public_rounded,
                 iconBg: const Color(0xFFFDF3D7),
                 iconColor: const Color(0xFFC99A2C),
                 judul: 'Bahasa',
                 sub: 'Pilih bahasa aplikasi',
-                nilai: 'Bahasa Indonesia',
-                onTap: () => _showSnack('Pengaturan Bahasa (segera)'),
-              ),
+                nilai: _bahasa,
+                onTap: _pilihBahasa,
+               ),
               _MenuSetting(
                 icon: Icons.lock_rounded,
                 iconBg: const Color(0xFFFDF3D7),
@@ -242,14 +337,18 @@ class _ProfilPageState extends State<ProfilPage> {
                 sub: 'Kelola data pribadi dan keamanan akun',
                 onTap: () => _showSnack('Keamanan Akun (segera)'),
               ),
-              _MenuSetting(
+             _MenuSetting(
                 icon: Icons.info_outline_rounded,
                 iconBg: const Color(0xFFFDF3D7),
                 iconColor: const Color(0xFFC99A2C),
                 judul: 'Tentang MigraCare',
                 sub: 'Tentang aplikasi MigraCare',
-                onTap: () => _showSnack('Tentang MigraCare v1.0 (demo)'),
-              ),
+                onTap: () {
+                    Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const TentangPage()),
+                    );
+                },
+            ),
               const SizedBox(height: 20),
 
               // ================= KELUAR =================
