@@ -4,6 +4,7 @@ import 'detail_artikel.dart';
 import 'skrining.dart';
 import 'pengingat_obat.dart';
 import '../models/obat.dart';
+import 'daftar_artikel.dart';
 // Navigasi informasi layanan (fitur temanmu)
 import 'informasi_layanan.dart'
     show InformasiLayananPage, Layanan, daftarLayanan;
@@ -257,7 +258,7 @@ class _BerandaPageState extends State<BerandaPage> {
     );
   }
 
-  @override
+    @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -273,6 +274,8 @@ class _BerandaPageState extends State<BerandaPage> {
               const SizedBox(height: 20),
               _AiMigraineBanner(onMulaiSkrining: _bukaSkrining),
               const SizedBox(height: 24),
+
+              // ---------- INFORMASI LAYANAN ----------
               _SectionHeader(
                 title: 'Informasi Layanan',
                 onSeeAll: () {
@@ -285,11 +288,20 @@ class _BerandaPageState extends State<BerandaPage> {
               const SizedBox(height: 12),
               _ServiceList(services: _services, onCardTap: _bukaDetailLayanan),
               const SizedBox(height: 24),
+
+              // ---------- PENGINGAT OBAT ----------
               _buildSectionPengingatObat(),
               const SizedBox(height: 24),
+
+              // ---------- ARTIKEL POPULER ----------
               _SectionHeader(
                 title: 'Artikel Populer',
-                onSeeAll: () => _showSnack('Menuju halaman Artikel'),
+                onSeeAll: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                        builder: (_) => const DaftarArtikelPage()),
+                  );
+                },
               ),
               const SizedBox(height: 12),
               _ArticleList(articles: artikelPopuler),

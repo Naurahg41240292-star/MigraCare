@@ -18,7 +18,7 @@ class MigracareApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF6B4A2B)),
         scaffoldBackgroundColor: const Color(0xFFFAF4EA),
       ),
-      home: const SplashScreen(), 
+      home: const SplashScreen(),
     );
   }
 }

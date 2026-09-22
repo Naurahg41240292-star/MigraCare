@@ -4,6 +4,7 @@ import 'konsultasi.dart';
 import 'skrining.dart';
 import 'riwayat.dart';
 import '../theme.dart';
+import 'profil.dart' hide AppColors;
 
 /// Shell utama — SATU-SATUNYA pemilik bottom nav.
 /// Semua tab tinggal di dalam IndexedStack, nav tidak pernah berpindah.
@@ -29,7 +30,7 @@ class _HalamanUtamaState extends State<HalamanUtama> {
           SkriningPage(onSelesai: () => _pindahTab(3)),
           KonsultasiScreen(),
           RiwayatPage(onBukaSkrining: () => _pindahTab(1)),
-          const _Placeholder('Profil'),
+          const ProfilPage(),
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
@@ -68,30 +69,6 @@ class _HalamanUtamaState extends State<HalamanUtama> {
             label: 'Profil',
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _Placeholder extends StatelessWidget {
-  const _Placeholder(this.judul);
-
-  final String judul;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.construction_rounded, size: 44, color: AppColors.textGrey),
-            const SizedBox(height: 10),
-            Text('Halaman $judul belum dibuat',
-                style: const TextStyle(fontSize: 13, color: AppColors.textGrey)),
-          ],
-        ),
       ),
     );
   }
