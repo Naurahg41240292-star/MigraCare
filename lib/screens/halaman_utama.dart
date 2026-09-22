@@ -3,6 +3,7 @@ import 'beranda.dart' hide AppColors;
 import 'konsultasi.dart';
 import 'skrining.dart';
 import '../theme.dart';
+import 'profil.dart' hide AppColors;
 
 /// Shell utama — SATU-SATUNYA pemilik bottom nav.
 /// Semua tab tinggal di dalam IndexedStack, nav tidak pernah berpindah.
@@ -28,7 +29,7 @@ class _HalamanUtamaState extends State<HalamanUtama> {
           const SkriningPage(),
           KonsultasiScreen(),
           const _Placeholder('Riwayat'),
-          const _Placeholder('Profil'),
+          const ProfilPage(),
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
