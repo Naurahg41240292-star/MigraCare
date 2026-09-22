@@ -5,18 +5,16 @@ import 'skrining.dart';
 import 'pengingat_obat.dart';
 import '../models/obat.dart';
 import 'daftar_artikel.dart';
-// Navigasi informasi layanan (fitur temanmu)
 import 'informasi_layanan.dart'
-    show InformasiLayananPage, Layanan, daftarLayanan;
+    show InformasiLayananPage, daftarLayanan;
 import 'detail_layanan.dart' show DetailLayananPage;
 
 /// ==========================================================================
-///  MIGRACARE — Halaman Beranda (v12 — merge final)
+///  MIGRACARE — Halaman Beranda (v14)
+///  Tombol khusus "Kelola Pengingat Obat" + kartu notifikasi (toggle)
 ///  File: lib/screens/beranda.dart
 /// ==========================================================================
 
-/// Warna didefinisikan lokal (mandiri, tanpa theme.dart)
-/// agar tidak bentrok lagi dengan file lain.
 abstract class AppColors {
   static const Color background = Color(0xFFFAF4EA);
   static const Color surface = Colors.white;
@@ -52,6 +50,17 @@ class BerandaPage extends StatefulWidget {
 }
 
 class _BerandaPageState extends State<BerandaPage> {
+  @override
+  void initState() {
+    super.initState();
+    _muatDataPengingat();
+  }
+
+  Future<void> _muatDataPengingat() async {
+    await PengingatStore.instance.muatDariDisk();
+    if (mounted) setState(() {});
+  }
+
   static const List<_Service> _services = [
     _Service(
       name: 'RS AL Huda Banyuwangi',
@@ -100,8 +109,6 @@ class _BerandaPageState extends State<BerandaPage> {
       );
   }
 
-  /// Kalau beranda dibuka dari halaman_utama (dengan tab), pindah tab.
-  /// Kalau dibuka berdiri sendiri, push halaman skrining.
   void _bukaSkrining() {
     if (widget.onBukaSkrining != null) {
       widget.onBukaSkrining!();
@@ -112,9 +119,6 @@ class _BerandaPageState extends State<BerandaPage> {
     }
   }
 
-  /// Klik kartu layanan di beranda:
-  /// push Informasi Layanan dulu (lapisan bawah), lalu Detail di atasnya,
-  /// sehingga "back" dari Detail mendarat di Informasi Layanan.
   void _bukaDetailLayanan(_Service service) {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const InformasiLayananPage()),
@@ -129,16 +133,15 @@ class _BerandaPageState extends State<BerandaPage> {
     }
   }
 
-  // ===== Navigasi ke halaman Pengingat Obat =====
   Future<void> _bukaPengingatObat() async {
     await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const PengingatObatPage()),
     );
-    setState(() {}); // refresh kartu pengingat setelah kembali
+    setState(() {});
   }
 
-  // ====== SECTION PENGINGAT OBAT (DINAMIS) ======
+  // ====== SECTION PENGINGAT OBAT (TOMBOL KHUSUS + KARTU NOTIFIKASI) ======
   Widget _buildSectionPengingatObat() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -154,10 +157,68 @@ class _BerandaPageState extends State<BerandaPage> {
             ),
           ),
           const SizedBox(height: 12),
-          GestureDetector(
+
+          // ===== TOMBOL KHUSUS → HALAMAN PENGINGAT OBAT =====
+          InkWell(
             onTap: _bukaPengingatObat,
-            child: _isiKartuPengingat(),
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.accent, width: 1.4),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x1AF2C230),
+                    blurRadius: 10,
+                    offset: Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: const BoxDecoration(
+                      color: AppColors.accent,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.medication_rounded,
+                        color: AppColors.darkBrown, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Kelola Pengingat Obat',
+                          style: TextStyle(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textDark),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Tambah obat, atur jadwal & lihat riwayat',
+                          style: TextStyle(
+                              fontSize: 11.5, color: AppColors.textGrey),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right_rounded,
+                      color: AppColors.accentDark),
+                ],
+              ),
+            ),
           ),
+          const SizedBox(height: 12),
+
+          // ===== KARTU NOTIFIKASI (TOGGLE SAJA) =====
+          _isiKartuPengingat(),
         ],
       ),
     );
@@ -173,25 +234,35 @@ class _BerandaPageState extends State<BerandaPage> {
           const SizedBox(width: 12),
           const Expanded(
             child: Text(
-              'Belum ada pengingat obat.\nKetuk kartu ini untuk mengatur pengingat.',
+              'Belum ada pengingat obat',
               style: TextStyle(color: AppColors.textGrey, height: 1.4),
             ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              color: AppColors.primary,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: const Text('+ Atur',
-                style:
-                    TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
           ),
         ],
       ));
     }
 
-    final obat = store.obatBerikutnya ?? store.daftarObat.first;
+    final jadwal = store.jadwalBerikutnyaHariIni();
+    if (jadwal == null) {
+      return _kartuPengingat(Row(
+        children: [
+          _ikonBulat(Icons.check_circle_rounded),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              'Semua obat sudah diminum hari ini 🎉',
+              style: TextStyle(
+                  fontWeight: FontWeight.w700, color: AppColors.textDark),
+            ),
+          ),
+        ],
+      ));
+    }
+
+    final obat = jadwal.obat;
+    final keterangan =
+        obat.catatanMinum.isNotEmpty ? obat.catatanMinum : obat.bentukSediaan;
+
     return _kartuPengingat(Row(
       children: [
         _ikonBulat(Icons.access_time_rounded),
@@ -200,36 +271,66 @@ class _BerandaPageState extends State<BerandaPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(obat.jam,
-                  style:
-                      const TextStyle(color: AppColors.textGrey, fontSize: 13)),
+              Text(jadwal.jam,
+                  style: const TextStyle(
+                      color: AppColors.textGrey, fontSize: 13)),
               Text('${obat.nama} ${obat.dosis}',
                   style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w800,
                       color: AppColors.textDark)),
-              Text(obat.aturan,
-                  style:
-                      const TextStyle(color: AppColors.textGrey, fontSize: 13)),
+              Text(keterangan,
+                  style: const TextStyle(
+                      color: AppColors.textGrey, fontSize: 13)),
             ],
           ),
         ),
-        obat.sudahDiminum
-            ? const Text('✓ Sudah diminum',
-                style: TextStyle(
-                    color: Color(0xFF3E7C3E), fontWeight: FontWeight.w700))
-            : ElevatedButton(
-                onPressed: () => setState(() => obat.sudahDiminum = true),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.accent,
-                  foregroundColor: AppColors.darkBrown,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20)),
-                ),
-                child: const Text('Sudah Diminum'),
+        const SizedBox(width: 8),
+
+        if (!jadwal.sudahDiminum)
+          ElevatedButton(
+            onPressed: () =>
+                setState(() => store.tandaiDiminum(obat, jadwal.jam)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.accent,
+              foregroundColor: AppColors.darkBrown,
+              elevation: 0,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Sudah Diminum',
+                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
+          )
+        else
+          InkWell(
+            onTap: () {
+              setState(() => store.batalkanDiminum(obat, jadwal.jam));
+              showAppSnack(context, 'Ditandai belum diminum');
+            },
+            borderRadius: BorderRadius.circular(10),
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE4F3E4),
+                borderRadius: BorderRadius.circular(10),
               ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.check_circle, color: Color(0xFF3E7C3E), size: 16),
+                  SizedBox(width: 6),
+                  Text('Sudah diminum',
+                      style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF3E7C3E))),
+                ],
+              ),
+            ),
+          ),
       ],
     ));
   }
@@ -337,8 +438,8 @@ class _GreetingHeader extends StatelessWidget {
                 ),
                 SizedBox(height: 4),
                 Text(
-                  // PENANDA VERSI v12 — kalau muncul di layar, berarti merge final sudah jalan!
-                  'Bagaimana Kondisi Anda hari ini?  •  v12',
+                  // PENANDA VERSI v14
+                  'Bagaimana Kondisi Anda hari ini?  •  v14',
                   style: TextStyle(fontSize: 13, color: AppColors.textGrey),
                 ),
               ],

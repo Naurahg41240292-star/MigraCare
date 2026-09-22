@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme.dart';
 import '../services/riwayat_service.dart';
-import 'detail_riwayat.dart';
+import 'detail_riwayat_skrining.dart';
 
 class RiwayatPage extends StatefulWidget {
   const RiwayatPage({super.key, this.onBukaSkrining});
@@ -71,7 +71,7 @@ class _RiwayatPageState extends State<RiwayatPage> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => DetailRiwayatPage(item: item),
+        builder: (_) => DetailRiwayatSkriningPage(item: item),
       ),
     );
   }

@@ -1,459 +1,242 @@
 import 'package:flutter/material.dart';
-import '../theme.dart';
-import '../services/riwayat_service.dart';
+import '../models/obat.dart';
+
+/// ==========================================================================
+///  MIGRACARE — Halaman Detail Riwayat
+///  File: lib/screens/detail_riwayat.dart
+/// ==========================================================================
 
 class DetailRiwayatPage extends StatelessWidget {
-  const DetailRiwayatPage({super.key, required this.item});
+  final DateTime tanggal;
 
-  final RiwayatItem item;
+  const DetailRiwayatPage({super.key, required this.tanggal});
 
-  String _formatWaktuLengkap(DateTime d) {
-    const bulan = [
-      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
-    ];
-    final jam = d.hour.toString().padLeft(2, '0');
-    final menit = d.minute.toString().padLeft(2, '0');
-    return '${d.day} ${bulan[d.month - 1]} ${d.year}, $jam:$menit WIB';
-  }
+  static const Color background = Color(0xFFFAF4EA);
+  static const Color surface = Colors.white;
+  static const Color orange = Color(0xFFDE8500);
+  static const Color textDark = Color(0xFF33261A);
+  static const Color textGrey = Color(0xFF9C948A);
+  static const Color outline = Color(0xFFEDE3D4);
+  static const Color green = Color(0xFF3E7C3E);
+  static const Color greenBg = Color(0xFFE4F3E4);
+  static const Color orangeBg = Color(0xFFFDEEDC);
 
-  Color _badgeColor(String intensitas) {
-    switch (intensitas) {
-      case 'Berat':
-        return Colors.red.shade400;
-      case 'Sedang':
-        return const Color(0xFFDD9438);
-      case 'Ringan':
-        return Colors.green.shade500;
-      default:
-        return Colors.grey;
-    }
-  }
+  static const List<String> _namaHari = [
+    'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu',
+  ];
+  static const List<String> _namaBulan = [
+    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli',
+    'Agustus', 'September', 'Oktober', 'November', 'Desember',
+  ];
 
-  Future<void> _konfirmasiHapus(BuildContext context) async {
-    final setuju = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
-          'Hapus Riwayat?',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textDark,
-          ),
-        ),
-        content: const Text(
-          'Apakah Anda yakin ingin menghapus data riwayat skrining ini?',
-          style: TextStyle(fontSize: 13, color: AppColors.textGrey),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Batal', style: TextStyle(color: AppColors.textGrey)),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red.shade400,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: const Text('Hapus'),
-          ),
-        ],
-      ),
-    );
+  String get _tanggalTampil =>
+      '${_namaHari[tanggal.weekday - 1]}, ${tanggal.day} ${_namaBulan[tanggal.month - 1]} ${tanggal.year}';
 
-    if (setuju == true) {
-      await RiwayatService.instance.hapus(item.id);
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Riwayat berhasil dihapus'),
-            backgroundColor: AppColors.darkBrown,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-        );
-        Navigator.of(context).pop();
-      }
-    }
-  }
+  String _jamTampil(String jam) => jam.replaceAll('.', ':');
 
   @override
   Widget build(BuildContext context) {
-    final detail = item.detailJawaban;
-
-    // Ambil probabilitas yang tersimpan dan urutkan dari tertinggi ke terendah
-    final sortedProbs = item.probabilities.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
+    final store = PengingatStore.instance;
+    final entri = store.daftarRiwayat
+        .where((r) =>
+            r.tanggal.year == tanggal.year &&
+            r.tanggal.month == tanggal.month &&
+            r.tanggal.day == tanggal.day)
+        .toList()
+      ..sort((a, b) => a.jam.compareTo(b.jam));
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: background,
       appBar: AppBar(
-        backgroundColor: AppColors.background,
+        backgroundColor: background,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textDark),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: const Text(
-          'Detail Skrining',
-          style: TextStyle(
-            fontSize: 17,
-            fontWeight: FontWeight.w800,
-            color: AppColors.textDark,
-          ),
-        ),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
-            tooltip: 'Hapus Riwayat',
-            onPressed: () => _konfirmasiHapus(context),
-          ),
-        ],
+        iconTheme: const IconThemeData(color: textDark),
+        title: const Text('Detail Riwayat',
+            style: TextStyle(color: textDark, fontWeight: FontWeight.w800)),
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 10, 20, 30),
-          child: Column(
+      body: entri.isEmpty
+          ? const Center(
+              child: Text('Tidak ada riwayat pada tanggal ini.',
+                  style: TextStyle(color: textGrey)),
+            )
+          : SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ---- Kartu tanggal ----
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: surface,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: outline),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.calendar_month_rounded,
+                            color: orange),
+                        const SizedBox(width: 12),
+                        Text(_tanggalTampil,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 16,
+                                color: textDark)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // ---- Kartu tiap entri ----
+                  for (final r in entri) ...[
+                    _kartuEntri(r, store),
+                    const SizedBox(height: 14),
+                  ],
+
+                  const SizedBox(height: 8),
+
+                  // ---- Catatan kaki ----
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFDF3DC),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.info_outline, color: orange),
+                        const SizedBox(width: 10),
+                        const Expanded(
+                          child: Text(
+                            'Riwayat ini berdasarkan pengingat yang telah anda atur di MigraCare',
+                            style: TextStyle(
+                                fontSize: 12.5,
+                                color: textDark,
+                                height: 1.4),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+    );
+  }
+
+  Widget _kartuEntri(RiwayatObat r, PengingatStore store) {
+    final jamNum = int.tryParse(r.jam.split('.').first) ?? 8;
+    final pagi = jamNum < 12;
+
+    Obat? obat;
+    for (final o in store.daftarObat) {
+      if (o.id == r.idObat) {
+        obat = o;
+        break;
+      }
+    }
+    final bentuk = obat?.bentukSediaan ?? '';
+    final catatan =
+        (r.catatan != null && r.catatan!.isNotEmpty) ? r.catatan! : '-';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: outline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ---------- KARTU WAKTU & STATUS ----------
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.outline),
-                  boxShadow: AppShadows.card,
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFC9822E).withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(Icons.history_edu_rounded,
-                          color: Color(0xFFC9822E), size: 24),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Waktu Pemeriksaan',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: AppColors.textGrey,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            _formatWaktuLengkap(item.waktu),
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textDark,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: _badgeColor(item.intensitas).withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        item.intensitas,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: _badgeColor(item.intensitas),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 18),
-
-              // ---------- KARTU HASIL UTAMA AI ----------
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.outline),
-                  boxShadow: AppShadows.card,
-                ),
+              Icon(pagi ? Icons.wb_sunny_rounded : Icons.nights_stay_rounded,
+                  color: orange, size: 22),
+              const SizedBox(width: 10),
+              Expanded(
                 child: Column(
-                  children: [
-                    const Text(
-                      'Kemungkinan Tipe Migrain:',
-                      style: TextStyle(fontSize: 12, color: AppColors.textGrey),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      item.hasil,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textDark,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Container(
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFC9822E).withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        'Tingkat Keyakinan: ${(item.confidence * 100).toStringAsFixed(1)}%',
-                        style: const TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFFC9822E),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              if (sortedProbs.isNotEmpty) ...[
-                const SizedBox(height: 20),
-                const Text(
-                  'Distribusi Kemungkinan Kelas:',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textDark,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppColors.outline),
-                  ),
-                  child: Column(
-                    children: sortedProbs.map((e) {
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    e.key,
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: AppColors.textDark,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                                Text(
-                                  '${(e.value * 100).toStringAsFixed(1)}%',
-                                  style: const TextStyle(
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.textGrey,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 5),
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(4),
-                              child: LinearProgressIndicator(
-                                value: e.value,
-                                minHeight: 6,
-                                backgroundColor: const Color(0xFFE7DFD2),
-                                color: const Color(0xFFC9822E),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ),
-              ],
-
-              const SizedBox(height: 20),
-
-              // ---------- RINCIAN JAWABAN SAAT SKRINING ----------
-              const Text(
-                'Rincian Jawaban Skrining:',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textDark,
-                ),
-              ),
-              const SizedBox(height: 10),
-
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.outline),
-                ),
-                child: detail.isEmpty
-                    ? const Text(
-                        'Rincian data jawaban tidak tersedia.',
-                        style: TextStyle(fontSize: 12, color: AppColors.textGrey),
-                      )
-                    : Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (detail['tanggalLahir'] != null || detail['umur'] != null)
-                            _itemRincian(
-                              'Usia & Tanggal Lahir',
-                              '${detail['tanggalLahir'] ?? '-'} (${detail['umur'] ?? '-'} tahun)',
-                            ),
-                          _itemRincian('Intensitas Nyeri', item.intensitas),
-                          if (detail['durasi'] != null)
-                            _itemRincian('Durasi Serangan', detail['durasi'].toString()),
-                          if (detail['frekuensi'] != null)
-                            _itemRincian('Frekuensi', detail['frekuensi'].toString()),
-                          if (detail['karakter'] != null)
-                            _itemRincian('Karakter Rasa Sakit', detail['karakter'].toString()),
-                          if (detail['lokasi'] != null)
-                            _itemRincian('Lokasi Nyeri', detail['lokasi'].toString()),
-                          if (detail['gejala'] != null)
-                            _itemRincianList('Gejala Tambahan', detail['gejala']),
-                          if (detail['visualAura'] != null)
-                            _itemRincianList('Aura Visual', detail['visualAura']),
-                          if (detail['sensory'] != null)
-                            _itemRincian('Gejala Sensorik', detail['sensory'].toString()),
-                          if (detail['pemicu'] != null)
-                            _itemRincianList('Faktor Pemicu', detail['pemicu']),
-                          if (detail['neuro'] != null)
-                            _itemRincianList('Gejala Neurologis', detail['neuro']),
-                          if (detail['riwayatKeluarga'] != null)
-                            _itemRincian('Riwayat Keluarga (Genetik)',
-                                detail['riwayatKeluarga'].toString()),
-                        ],
-                      ),
-              ),
-
-              const SizedBox(height: 16),
-
-              // ---------- DISCLAIMER ----------
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF7DBB0).withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFF2C230).withValues(alpha: 0.5)),
-                ),
-                child: const Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.info_outline_rounded,
-                        color: Color(0xFFB07E1F), size: 18),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Hasil ini merupakan analisis kecerdasan buatan dan bukan merupakan pengganti diagnosis medis resmi. Konsultasikan dengan dokter spesialis saraf untuk penanganan medis tepat.',
-                        style: TextStyle(fontSize: 11, color: AppColors.textDark),
-                      ),
-                    ),
+                    Text(_jamTampil(r.jam),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                            color: textDark)),
+                    Text('${r.namaObat} ${r.dosisObat}',
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                            color: textDark)),
+                    if (bentuk.isNotEmpty)
+                      Text('1 $bentuk',
+                          style: const TextStyle(
+                              fontSize: 12, color: textGrey)),
                   ],
                 ),
               ),
-
-              const SizedBox(height: 20),
-
-              // ---------- TOMBOL KEMBALI ----------
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    side: const BorderSide(color: Color(0xFFC9822E)),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: r.sudahDiminum ? greenBg : orangeBg,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      r.sudahDiminum ? 'Sudah diminum' : 'Belum diminum',
+                      style: TextStyle(
+                          fontSize: 11,
+                          color: r.sudahDiminum ? green : orange),
                     ),
-                  ),
-                  child: const Text(
-                    'Kembali ke Riwayat',
-                    style: TextStyle(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFFC9822E),
+                    const SizedBox(width: 4),
+                    Icon(
+                      r.sudahDiminum
+                          ? Icons.check_circle
+                          : Icons.notifications_active,
+                      size: 14,
+                      color: r.sudahDiminum ? green : orange,
                     ),
-                  ),
+                  ],
                 ),
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _itemRincian(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 11,
-              color: AppColors.textGrey,
-              fontWeight: FontWeight.w500,
-            ),
+          const Divider(height: 22, color: outline),
+          _barisInfo(
+            Icons.access_time_rounded,
+            r.sudahDiminum ? 'Waktu diminum' : 'Waktu dijadwalkan',
+            _jamTampil(r.sudahDiminum ? (r.waktuDiminum ?? r.jam) : r.jam),
           ),
-          const SizedBox(height: 3),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textDark,
-            ),
-          ),
+          const SizedBox(height: 10),
+          _barisInfo(Icons.notes_rounded, 'Catatan', catatan),
         ],
       ),
     );
   }
 
-  Widget _itemRincianList(String label, dynamic list) {
-    final items = (list is List) ? list.map((e) => e.toString()).toList() : <String>[];
-    final display = items.isEmpty ? 'Tidak ada / Tidak dipilih' : items.join(', ');
-    return _itemRincian(label, display);
+  Widget _barisInfo(IconData icon, String label, String nilai) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: textGrey),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(label,
+              style: const TextStyle(fontSize: 13, color: textGrey)),
+        ),
+        Text(nilai,
+            style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: textDark)),
+      ],
+    );
   }
 }
