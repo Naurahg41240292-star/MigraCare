@@ -1,8 +1,8 @@
-import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
-/// Model item riwayat skrining
+/// Model item riwayat skrining — field & constructor TIDAK BERUBAH
 class RiwayatItem {
   final String id;
   final DateTime waktu;
@@ -26,9 +26,9 @@ class RiwayatItem {
         probabilities = probabilities ?? const {},
         detailJawaban = detailJawaban ?? const {};
 
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'waktu': waktu.toIso8601String(),
+  /// Ke format dokumen Firestore ('id' tidak disimpan — id = doc id)
+  Map<String, dynamic> toFirestore() => {
+        'waktu': Timestamp.fromDate(waktu),
         'hasil': hasil,
         'confidence': confidence,
         'intensitas': intensitas,
@@ -37,72 +37,73 @@ class RiwayatItem {
         'detailJawaban': detailJawaban,
       };
 
-  factory RiwayatItem.fromJson(Map<String, dynamic> json) {
+  /// Dari dokumen Firestore
+  factory RiwayatItem.fromDoc(String docId, Map<String, dynamic> m) {
+    final rawWaktu = m['waktu'];
+    final waktu = rawWaktu is Timestamp
+        ? rawWaktu.toDate()
+        : (DateTime.tryParse(rawWaktu?.toString() ?? '') ?? DateTime.now());
+
     return RiwayatItem(
-      id: json['id'] as String? ?? '',
-      waktu:
-          DateTime.tryParse(json['waktu'] as String? ?? '') ?? DateTime.now(),
-      hasil: json['hasil'] as String? ?? '-',
-      confidence: (json['confidence'] as num?)?.toDouble() ?? 0.0,
-      intensitas: json['intensitas'] as String? ?? '-',
-      probabilities: (json['probabilities'] as Map<String, dynamic>?)?.map(
+      id: docId,
+      waktu: waktu,
+      hasil: m['hasil'] as String? ?? '-',
+      confidence: (m['confidence'] as num?)?.toDouble() ?? 0.0,
+      intensitas: m['intensitas'] as String? ?? '-',
+      probabilities: (m['probabilities'] as Map<String, dynamic>?)?.map(
             (k, v) => MapEntry(k, (v as num).toDouble()),
           ) ??
           {},
-      fitur: (json['fitur'] as List?)
+      fitur: (m['fitur'] as List?)
               ?.map((e) => (e as num).toDouble())
               .toList() ??
           [],
-      detailJawaban:
-          (json['detailJawaban'] as Map<String, dynamic>?) ?? {},
+      detailJawaban: (m['detailJawaban'] as Map<String, dynamic>?) ?? {},
     );
   }
 }
 
-/// Service untuk menyimpan dan membaca riwayat skrining secara persisten
+/// Service riwayat — sekarang tersimpan di CLOUD FIRESTORE ☁️
+/// Struktur: users/{uid}/screenings/{docId}
 class RiwayatService extends ChangeNotifier {
   RiwayatService._();
   static final RiwayatService instance = RiwayatService._();
 
-  static const String _storageKey = 'migracare_riwayat_skrining';
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  /// Mengambil semua riwayat skrining, diurutkan dari yang paling baru
+  /// Pastikan ada user (anonymous) — uid dipakai sebagai folder data user
+  Future<User> _ensureUser() async {
+    User? user = _auth.currentUser;
+    user ??= (await _auth.signInAnonymously()).user!;
+    return user;
+  }
+
+  CollectionReference<Map<String, dynamic>> _col(String uid) => _db
+      .collection('users')
+      .doc(uid)
+      .collection('screenings');
+
+  /// Mengambil semua riwayat, terbaru duluan
   Future<List<RiwayatItem>> ambilSemua() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final rawList = prefs.getStringList(_storageKey) ?? [];
-
-      final items = <RiwayatItem>[];
-      for (final raw in rawList) {
-        try {
-          final map = jsonDecode(raw) as Map<String, dynamic>;
-          items.add(RiwayatItem.fromJson(map));
-        } catch (_) {
-          // Lewati item yang rusak
-        }
-      }
-
-      // Urutkan dari waktu terbaru ke terlama
-      items.sort((a, b) => b.waktu.compareTo(a.waktu));
-      return items;
-    } catch (_) {
+      final uid = (await _ensureUser()).uid;
+      final snap =
+          await _col(uid).orderBy('waktu', descending: true).get();
+      return snap.docs
+          .map((d) => RiwayatItem.fromDoc(d.id, d.data()))
+          .toList();
+    } catch (e) {
+      debugPrint('Gagal membaca riwayat: $e');
       return [];
     }
   }
 
-  /// Menambahkan riwayat baru
+  /// Menambahkan riwayat baru ke Firestore
   Future<void> tambah(RiwayatItem item) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final items = await ambilSemua();
-
-      // Tambah di awal list
-      items.removeWhere((e) => e.id == item.id);
-      items.insert(0, item);
-
-      final stringList = items.map((e) => jsonEncode(e.toJson())).toList();
-      await prefs.setStringList(_storageKey, stringList);
-
+      final uid = (await _ensureUser()).uid;
+      await _col(uid).doc(item.id).set(item.toFirestore());
       notifyListeners();
     } catch (e) {
       debugPrint('Gagal menyimpan riwayat: $e');
@@ -112,14 +113,8 @@ class RiwayatService extends ChangeNotifier {
   /// Menghapus satu riwayat berdasarkan ID
   Future<void> hapus(String id) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final items = await ambilSemua();
-
-      items.removeWhere((e) => e.id == id);
-
-      final stringList = items.map((e) => jsonEncode(e.toJson())).toList();
-      await prefs.setStringList(_storageKey, stringList);
-
+      final uid = (await _ensureUser()).uid;
+      await _col(uid).doc(id).delete();
       notifyListeners();
     } catch (e) {
       debugPrint('Gagal menghapus riwayat: $e');
@@ -129,8 +124,11 @@ class RiwayatService extends ChangeNotifier {
   /// Menghapus seluruh riwayat
   Future<void> bersihkan() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_storageKey);
+      final uid = (await _ensureUser()).uid;
+      final snap = await _col(uid).get();
+      for (final doc in snap.docs) {
+        await doc.reference.delete();
+      }
       notifyListeners();
     } catch (e) {
       debugPrint('Gagal membersihkan riwayat: $e');
