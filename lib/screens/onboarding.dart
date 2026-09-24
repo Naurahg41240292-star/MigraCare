@@ -1,22 +1,28 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'welcome.dart';
 
 /// ==========================================================================
-///  MIGRACARE — Onboarding (3 halaman, swipe kiri/kanan)
+///  MIGRACARE — Onboarding v3
+///  Teks di ATAS · gambar TIMBUL di kartu · dekorasi kilau ✦ (tanpa bulat)
 ///  File: lib/screens/onboarding.dart
 /// ==========================================================================
 
 abstract class _Ob {
-  static const Color bg = Color(0xFFFAF4EA);
-  static const Color button = Color(0xFFD69348);
+  static const Color bgTop = Color(0xFFFDFBF7);
+  static const Color bgBottom = Color(0xFFFAF1DE);
+  static const Color button1 = Color(0xFFD69348);
+  static const Color button2 = Color(0xFFBC7D33);
   static const Color textDark = Color(0xFF33261A);
   static const Color textGrey = Color(0xFF8F8578);
-  static const Color dotActive = Color(0xFF8A6A3F);
-  static const Color dotInactive = Color(0xFFD9CCB4);
-  static const Color glow = Color(0xFFF7EDD9);
+  static const Color dotActive = Color(0xFFBC7D33);
+  static const Color dotInactive = Color(0xFFE3D7C0);
+  static const Color sparkle = Color(0xFFE0A852); // kilauan bintang
+  static const Color sparkleSoft = Color(0xFFF0CE8E);
+  static const Color cardBorder = Color(0xFFF3E7CE);
 }
 
-/// Data satu halaman onboarding
 class _OnboardData {
   const _OnboardData({
     required this.title,
@@ -36,22 +42,25 @@ class OnboardingPage extends StatefulWidget {
   State<OnboardingPage> createState() => _OnboardingPageState();
 }
 
-class _OnboardingPageState extends State<OnboardingPage> {
+class _OnboardingPageState extends State<OnboardingPage>
+    with SingleTickerProviderStateMixin {
   final PageController _controller = PageController();
   int _index = 0;
+
+  late final AnimationController _float;
 
   static const List<_OnboardData> _pages = [
     _OnboardData(
       title: 'Kenali Migraine Anda',
       description:
           'Aplikasi yang membantu Anda melakukan skrining, memantau, mengelola migrain, dan menjaga kesehatan dengan lebih baik',
-       image: 'assets/images/foto_onboarding 1.png',
+      image: 'assets/images/foto_onboarding 1.png',
     ),
     _OnboardData(
       title: 'Pantau Migraine Anda',
       description:
           'Catat intensitas, durasi, gejala, dan pemicu migraine dari waktu ke waktu',
-       image: 'assets/images/foto_onboarding 2.png',
+      image: 'assets/images/foto_onboarding 2.png',
     ),
     _OnboardData(
       title: 'Kelola Kesehatan Anda',
@@ -63,106 +72,215 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
   bool get _isLast => _index == _pages.length - 1;
 
+  @override
+  void initState() {
+    super.initState();
+    _float = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2400),
+      lowerBound: 0,
+      upperBound: 1,
+    )..repeat(reverse: true);
+  }
+
   void _next() {
     if (_isLast) {
-      // Halaman terakhir → ke halaman Selamat Datang
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const WelcomePage()),
-      );
+      Navigator.of(context).push(_FadeRoute(page: const WelcomePage()));
       return;
     }
     _controller.nextPage(
-      duration: const Duration(milliseconds: 420),
+      duration: const Duration(milliseconds: 450),
       curve: Curves.easeOutCubic,
     );
+  }
+
+  void _skip() {
+    Navigator.of(context).push(_FadeRoute(page: const WelcomePage()));
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    _float.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final judulFont = GoogleFonts.poppins;
+    final isiFont = GoogleFonts.poppins;
+
     return Scaffold(
-      backgroundColor: _Ob.bg,
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // ---------- Halaman (bisa di-swipe kiri/kanan) ------------------
-            Expanded(
-              child: PageView.builder(
-                controller: _controller,
-                itemCount: _pages.length,
-                onPageChanged: (i) => setState(() => _index = i),
-                itemBuilder: (context, i) {
-                  final data = _pages[i];
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 28),
-                    child: Column(
-                      children: [
-                        const SizedBox(height: 50),
-                        Text(
-                          data.title,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 26,
-                            fontWeight: FontWeight.w800,
-                            color: _Ob.textDark,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [_Ob.bgTop, _Ob.bgBottom],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // ================= BAR ATAS =================
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 10, 12, 0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    AnimatedBuilder(
+                      animation: _controller,
+                      builder: (context, _) {
+                        final page =
+                            _controller.hasClients ? (_controller.page ?? 0) : 0.0;
+                        final nomor = (page.round() + 1).toString().padLeft(2, '0');
+                        return Text(
+                          '$nomor / ${_pages.length.toString().padLeft(2, '0')}',
+                          style: isiFont(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 2,
+                            color: _Ob.dotInactive,
                           ),
+                        );
+                      },
+                    ),
+                    TextButton(
+                      onPressed: _skip,
+                      style: TextButton.styleFrom(
+                        foregroundColor: _Ob.textGrey,
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                      ),
+                      child: Text(
+                        'Lewati',
+                        style: isiFont(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
                         ),
-                        const SizedBox(height: 12),
-                        Text(
-                          data.description,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 17,
-                            height: 1.6,
-                            fontWeight: FontWeight.w500,
-                            color: _Ob.textGrey,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // ================= HALAMAN SWIPE (parallax) =================
+              Expanded(
+                child: PageView.builder(
+                  controller: _controller,
+                  itemCount: _pages.length,
+                  onPageChanged: (i) {
+                    HapticFeedback.selectionClick();
+                    setState(() => _index = i);
+                  },
+                  itemBuilder: (context, i) {
+                    return AnimatedBuilder(
+                      animation: _controller,
+                      builder: (context, child) {
+                        double offset = 0;
+                        if (_controller.hasClients &&
+                            _controller.position.haveDimensions) {
+                          offset = (_controller.page ?? 0) - i;
+                        }
+                        final abs = offset.abs();
+                        return Opacity(
+                          opacity: (1 - abs * 0.55).clamp(0.0, 1.0),
+                          child: Transform.translate(
+                            offset: Offset(offset * -46, 0),
+                            child: Transform.scale(
+                              scale: 1.0 - (abs * 0.06),
+                              child: child,
+                            ),
                           ),
-                        ),
-                        Expanded(child: _Illustration(data: data)),
-                      ],
+                        );
+                      },
+                      child: _SlideContent(data: _pages[i], float: _float),
+                    );
+                  },
+                ),
+              ),
+
+              // ================= INDIKATOR (pill kecil) =================
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(_pages.length, (i) {
+                  final active = i == _index;
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeOutCubic,
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    width: active ? 28 : 14,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: active ? _Ob.dotActive : _Ob.dotInactive,
+                      borderRadius: BorderRadius.circular(3),
                     ),
                   );
-                },
+                }),
               ),
-            ),
+              const SizedBox(height: 26),
 
-            // ---------- Indikator titik ------------------------------------
-            _Dots(count: _pages.length, activeIndex: _index),
-            const SizedBox(height: 26),
-
-            // ---------- Tombol Selanjutnya ---------------------------------
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 30),
-              child: SizedBox(
-                width: double.infinity,
-                height: 54,
-                child: ElevatedButton(
-                  onPressed: _next,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _Ob.button,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+              // ================= TOMBOL GRADIEN =================
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 30),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      gradient: const LinearGradient(
+                        colors: [_Ob.button1, _Ob.button2],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: _Ob.button1.withOpacity(0.35),
+                          blurRadius: 14,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
                     ),
-                  ),
-                  child: Text(
-                    _isLast ? 'Mulai Sekarang' : 'Selanjutnya',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(16),
+                        onTap: _next,
+                        child: Center(
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 250),
+                            child: Row(
+                              key: ValueKey(_isLast),
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  _isLast ? 'Mulai Sekarang' : 'Selanjutnya',
+                                  style: judulFont(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Icon(
+                                  _isLast
+                                      ? Icons.rocket_launch_rounded
+                                      : Icons.arrow_forward_rounded,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -170,78 +288,166 @@ class _OnboardingPageState extends State<OnboardingPage> {
 }
 
 // ===========================================================================
-//  INDIKATOR TITIK
+//  ISI SATU HALAMAN — teks di atas, gambar melayang + bayangan tanah
 // ===========================================================================
-class _Dots extends StatelessWidget {
-  const _Dots({required this.count, required this.activeIndex});
-
-  final int count;
-  final int activeIndex;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(count, (i) {
-        final active = i == activeIndex;
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 250),
-          margin: const EdgeInsets.symmetric(horizontal: 5),
-          width: 9,
-          height: 9,
-          decoration: BoxDecoration(
-            color: active ? _Ob.dotActive : _Ob.dotInactive,
-            shape: BoxShape.circle,
-          ),
-        );
-      }),
-    );
-  }
-}
-
-// ===========================================================================
-// ILUSTRASI
-// ===========================================================================
-class _Illustration extends StatelessWidget {
-  const _Illustration({required this.data});
+class _SlideContent extends StatelessWidget {
+  const _SlideContent({required this.data, required this.float});
 
   final _OnboardData data;
+  final AnimationController float;
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: SizedBox(
-        width: 300,
-        height: 300,
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            // Cahaya lembut di belakang
-            Center(
-              child: Container(
-                width: 240,
-                height: 240,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [_Ob.glow, _Ob.bg],
-                    stops: [0.0, 1.0],
+    final judulFont = GoogleFonts.poppins;
+    final isiFont = GoogleFonts.poppins;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 28),
+      child: Column(
+        children: [
+          const SizedBox(height: 24),
+
+          // ================= JUDUL =================
+          TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: 1),
+            duration: const Duration(milliseconds: 650),
+            curve: Curves.easeOutCubic,
+            builder: (context, t, child) {
+              return Opacity(
+                opacity: t.clamp(0.0, 1.0),
+                child: Transform.translate(
+                  offset: Offset(0, 20 * (1 - t)),
+                  child: child,
+                ),
+              );
+            },
+            child: Text(
+              data.title,
+              textAlign: TextAlign.center,
+              style: judulFont(
+                fontSize: 26,
+                fontWeight: FontWeight.w800,
+                height: 1.3,
+                color: _Ob.textDark,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // ================= DESKRIPSI =================
+          TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: 1),
+            duration: const Duration(milliseconds: 800),
+            curve: Curves.easeOut,
+            builder: (context, t, child) {
+              return Opacity(
+                opacity: (t * 0.92).clamp(0.0, 1.0),
+                child: Transform.translate(
+                  offset: Offset(0, 14 * (1 - t)),
+                  child: child,
+                ),
+              );
+            },
+            child: Text(
+              data.description,
+              textAlign: TextAlign.center,
+              style: isiFont(
+                fontSize: 17,
+                height: 1.6,
+                fontWeight: FontWeight.w500,
+                color: _Ob.textGrey,
+              ),
+            ),
+          ),
+
+          // ========== GAMBAR MELAYANG + BAYANGAN TANAH ==========
+          Expanded(
+            child: Center(
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0, end: 1),
+                duration: const Duration(milliseconds: 750),
+                curve: Curves.easeOutBack,
+                builder: (context, t, child) {
+                  return Opacity(
+                    opacity: t.clamp(0.0, 1.0),
+                    child: Transform.scale(
+                        scale: 0.88 + 0.12 * t, child: child),
+                  );
+                },
+                child: AnimatedBuilder(
+                  animation: float,
+                  builder: (context, child) {
+                    final t = Curves.easeInOut.transform(float.value);
+                    return Stack(
+                      clipBehavior: Clip.none,
+                      alignment: Alignment.center,
+                      children: [
+                        // ---- Bayangan "tanah" di bawah gambar ----
+                        Positioned(
+                          bottom: 2,
+                          child: Opacity(
+                            opacity: (0.75 - 0.3 * t).clamp(0.0, 1.0),
+                            child: Container(
+                              width: 185 - 18 * t,
+                              height: 20,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(100),
+                                gradient: const RadialGradient(
+                                  colors: [
+                                    Color(0x4DC08A4A),
+                                    Color(0x00C08A4A),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        // ---- Gambar utama melayang ----
+                        Transform.translate(
+                          offset: Offset(0, -10 * t),
+                          child: child,
+                        ),
+                      ],
+                    );
+                  },
+                  child: Image.asset(
+                    data.image,
+                    width: 265,
+                    fit: BoxFit.contain,
                   ),
                 ),
               ),
             ),
-
-            // Gambar utama
-            Center(
-              child: Image.asset(
-                data.image,
-                width: 265,
-                fit: BoxFit.contain,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
+}
+
+// ===========================================================================
+//  TRANSISI ANTAR HALAMAN
+// ===========================================================================
+class _FadeRoute<T> extends PageRouteBuilder<T> {
+  _FadeRoute({required Widget page})
+      : super(
+          transitionDuration: const Duration(milliseconds: 450),
+          pageBuilder: (_, __, ___) => page,
+          transitionsBuilder: (_, animation, __, child) {
+            final curved = CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+            );
+            return FadeTransition(
+              opacity: curved,
+              child: SlideTransition(
+                position: Tween(
+                  begin: const Offset(0, 0.05),
+                  end: Offset.zero,
+                ).animate(curved),
+                child: child,
+              ),
+            );
+          },
+        );
 }
