@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'onboarding.dart';
 
 /// ==========================================================================
-///  MIGRACARE — Splash Screen v2 (animasi masuk berurutan + otak melayang)
+///  MIGRACARE — Splash Screen v3 (latar gradasi menyatu + animasi)
 ///  File: lib/screens/splash.dart
 /// ==========================================================================
 
@@ -16,16 +16,10 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen>
     with TickerProviderStateMixin {
-  // ---- Controller 1: animasi masuk (diputar sekali) ----
   late final AnimationController _entrance;
-
-  // ---- Controller 2: otak melayang (berulang selamanya) ----
   late final AnimationController _float;
-
-  // ---- Controller 3: indikator swipe berdenyut (berulang) ----
   late final AnimationController _bounce;
 
-  // Animasi masuk per-elemen (staggered interval)
   late final Animation<double> _waveFade;
   late final Animation<double> _logoFade;
   late final Animation<double> _logoSlide;
@@ -44,7 +38,6 @@ class _SplashScreenState extends State<SplashScreen>
   void initState() {
     super.initState();
 
-    // ======== ENTRANCE (sekali jalan, 1.4 detik) ========
     _entrance = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1400),
@@ -85,7 +78,6 @@ class _SplashScreenState extends State<SplashScreen>
 
     _entrance.forward();
 
-    // ======== FLOAT (otak melayang, selamanya) ========
     _float = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2200),
@@ -93,30 +85,25 @@ class _SplashScreenState extends State<SplashScreen>
       upperBound: 1,
     )..repeat(reverse: true);
 
-    // ======== BOUNCE (indikator swipe, selamanya) ========
     _bounce = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1100),
       lowerBound: 0,
       upperBound: 1,
     )..repeat(reverse: true);
-
-    // OPSI: pindah otomatis setelah 8 detik (splash klasik).
-    // Hapus komentar jika diinginkan:
-    // Future.delayed(const Duration(seconds: 8), _go);
   }
 
   void _go() {
     if (_navigated || !mounted) return;
     _navigated = true;
-    HapticFeedback.lightImpact(); // getar halus saat masuk
+    HapticFeedback.lightImpact();
     Navigator.of(context).pushReplacement(
       _SlideUpRoute(page: const OnboardingPage()),
     );
   }
 
   void _onDragUpdate(DragUpdateDetails d) {
-    if (d.delta.dy >= 0) return; // hanya merespons tarikan ke atas
+    if (d.delta.dy >= 0) return;
     setState(() {
       _dragging = true;
       _dragDy = (_dragDy + d.delta.dy).clamp(-220.0, 0.0);
@@ -130,7 +117,7 @@ class _SplashScreenState extends State<SplashScreen>
     if (cepat || jauh) {
       _go();
     } else {
-      setState(() => _dragDy = 0); // memantul kembali
+      setState(() => _dragDy = 0);
     }
   }
 
@@ -145,7 +132,7 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _Sp.bg,
+      backgroundColor: _Sp.bgTop,
       body: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: _go,
@@ -153,23 +140,54 @@ class _SplashScreenState extends State<SplashScreen>
         onVerticalDragEnd: _onDragEnd,
         child: Stack(
           children: [
-            // ---------------- Gelombang emas (fade-in pelan) -------------
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 50,
-              height: 420,
-              child: FadeTransition(
-                opacity: _waveFade,
-                child: Image.asset(
-                  'assets/images/gelombang.png',
-                  fit: BoxFit.cover,
-                  alignment: Alignment.bottomCenter,
+            // ============ LAPISAN 1: GRADASI LATAR PENUH ============
+            const Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      _Sp.bgTop,     // atas: hampir putih
+                      _Sp.bgMid,     // tengah: krem lembut
+                      _Sp.bgBottom,  // bawah: krem keemasan (nyatu dgn gelombang)
+                    ],
+                    stops: [0.0, 0.52, 1.0],
+                  ),
                 ),
               ),
             ),
 
-            // ---------------- Konten ---------------------------------------
+            // ===== LAPISAN 2: GELOMBANG (fade di tepi atas → menyatu) =====
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: 470,
+              child: ShaderMask(
+                // Fade: 25% atas gelombang dibuat transparan bertahap
+                shaderCallback: (rect) => LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    Colors.white,
+                  ],
+                  stops: const [0.0, 0.28],
+                ).createShader(rect),
+                blendMode: BlendMode.dstIn,
+                child: FadeTransition(
+                  opacity: _waveFade,
+                  child: Image.asset(
+                    'assets/images/gelombang.png',
+                    fit: BoxFit.cover,
+                    alignment: Alignment.bottomCenter,
+                  ),
+                ),
+              ),
+            ),
+
+            // ============================ KONTEN ============================
             SafeArea(
               child: AnimatedContainer(
                 duration: _dragging
@@ -179,7 +197,7 @@ class _SplashScreenState extends State<SplashScreen>
                 transform: Matrix4.translationValues(0, _dragDy, 0),
                 child: Column(
                   children: [
-                    // Logo kiri atas (fade + turun dari atas)
+                    // Logo kiri atas
                     Padding(
                       padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
                       child: Align(
@@ -204,15 +222,14 @@ class _SplashScreenState extends State<SplashScreen>
 
                     const Spacer(flex: 2),
 
-                    // ======== Ilustrasi otak: pop masuk + melayang + glow ====
+                    // ======== Otak: pop masuk + melayang + glow ========
                     AnimatedBuilder(
                       animation:
                           Listenable.merge([_brainFade, _float, _entrance]),
                       builder: (context, child) {
                         final naikTurun =
                             Curves.easeInOut.transform(_float.value);
-                        // Glow berdenyut mengikuti gerakan melayang
-                        final glowOpacity = 0.10 + 0.08 * naikTurun;
+                        final glowOpacity = 0.12 + 0.08 * naikTurun;
                         final melayang = -7.0 * naikTurun;
 
                         return Opacity(
@@ -225,10 +242,11 @@ class _SplashScreenState extends State<SplashScreen>
                               child: Stack(
                                 alignment: Alignment.center,
                                 children: [
-                                  // ---- Halo glow lembut di belakang otak ----
+                                  // Halo glow lembut — warnanya menyatu
+                                  // dengan gradasi latar
                                   Container(
-                                    width: 210,
-                                    height: 210,
+                                    width: 230,
+                                    height: 230,
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
                                       gradient: RadialGradient(
@@ -241,7 +259,6 @@ class _SplashScreenState extends State<SplashScreen>
                                       ),
                                     ),
                                   ),
-                                  // ---- Otak melayang ----
                                   Transform.translate(
                                     offset: Offset(0, melayang),
                                     child: child,
@@ -262,7 +279,7 @@ class _SplashScreenState extends State<SplashScreen>
 
                     const SizedBox(height: 36),
 
-                    // Judul (slide-up + fade)
+                    // Judul
                     AnimatedBuilder(
                       animation: _textFade,
                       builder: (context, child) => Opacity(
@@ -285,7 +302,7 @@ class _SplashScreenState extends State<SplashScreen>
                     ),
                     const SizedBox(height: 12),
 
-                    // Deskripsi (fade)
+                    // Deskripsi
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 36),
                       child: FadeTransition(
@@ -304,7 +321,7 @@ class _SplashScreenState extends State<SplashScreen>
 
                     const Spacer(flex: 3),
 
-                    // Indikator SWIPE (fade-in dulu, baru berdenyut)
+                    // Indikator SWIPE
                     AnimatedBuilder(
                       animation: Listenable.merge([_bounce, _indicatorFade]),
                       builder: (context, _) {
@@ -351,7 +368,7 @@ class _SplashScreenState extends State<SplashScreen>
 }
 
 // ===========================================================================
-//  TRANSISI HALUS ke Onboarding (fade + slide up)
+//  TRANSISI HALUS ke Onboarding
 // ===========================================================================
 class _SlideUpRoute<T> extends PageRouteBuilder<T> {
   _SlideUpRoute({required Widget page})
@@ -379,9 +396,14 @@ class _SlideUpRoute<T> extends PageRouteBuilder<T> {
 }
 
 class _Sp {
-  static const Color bg = Color(0xFFFDF9F4);
+  // ---- Warna gradasi latar (atas → bawah, makin hangat) ----
+  static const Color bgTop = Color(0xFFFDFBF7);
+  static const Color bgMid = Color(0xFFFAF2E3);
+  static const Color bgBottom = Color(0xFFF6E7C6);
+
+  static const Color bg = bgTop; // fallback
   static const Color textDark = Color(0xFF3A3028);
   static const Color textGrey = Color(0xFF8A8178);
   static const Color indicator = Color(0xFFC5A46D);
-  static const Color glow = Color(0xFFE8C77D); // warna halo di belakang otak
+  static const Color glow = Color(0xFFE8C77D);
 }
