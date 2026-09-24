@@ -19,9 +19,9 @@ abstract class _Sk {
 }
 
 class _Lokasi {
-  const _Lokasi(this.label, this.spots, {this.full = false});
+  const _Lokasi(this.label, this.image, {this.full = false});
   final String label;
-  final List<Alignment> spots;
+  final String image;
   final bool full;
 }
 
@@ -124,15 +124,15 @@ class _SkriningPageState extends State<SkriningPage> {
   ];
 
   static const List<_Lokasi> _lokasiOpsi = [
-    _Lokasi('Sakit Kepala', [], full: true),
-    _Lokasi('Satu Sisi Kepala', [Alignment(0.45, -0.1)]),
-    _Lokasi('Samping Kepala', [Alignment(0.55, -0.35)]),
-    _Lokasi('Dahi (Frontal)', [Alignment(0, -0.62)]),
-    _Lokasi('Belakang Mata', [Alignment(-0.3, 0.1), Alignment(0.3, 0.1)]),
-    _Lokasi('Sekitar Mata', [Alignment(-0.32, 0.05), Alignment(0.32, 0.05)]),
-    _Lokasi('Belakang Kepala', [Alignment(0, 0.75)]),
-    _Lokasi('Lainnya', [Alignment(0.6, 0.3)]),
-  ];
+  _Lokasi('Seluruh Kepala', 'assets/images/lokasi_seluruh.png', full: true),
+  _Lokasi('Satu Sisi Kepala', 'assets/images/lokasi_satu_sisi.png'),
+  _Lokasi('Samping Kepala', 'assets/images/lokasi_samping.png'),
+  _Lokasi('Dahi (Frontal)', 'assets/images/lokasi_dahi.png'),
+  _Lokasi('Belakang Mata', 'assets/images/lokasi_belakang_mata.png'),
+  _Lokasi('Sekitar Mata', 'assets/images/lokasi_sekitar_mata.png'),
+  _Lokasi('Belakang Kepala', 'assets/images/lokasi_belakang_kepala.png'),
+  _Lokasi('Lainnya', 'assets/images/lokasi_lainnya.png'),
+];
 
   static const List<int> _lokasiNilai = [2, 1, 1, 2, 1, 1, 1, 1];
 
@@ -859,6 +859,27 @@ class _PainFace extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 2),
+        child: Image.asset(
+          lokasi.image,
+          fit: BoxFit.contain,
+          // Gambar belum diexport? → tampilkan wajah oval sederhana
+          // supaya aplikasi tetap jalan tanpa error
+          errorBuilder: (_, __, ___) => const _FallbackFace(),
+        ),
+      ),
+    );
+  }
+}
+
+/// Fallback sementara sebelum gambar dari Figma di-export
+class _FallbackFace extends StatelessWidget {
+  const _FallbackFace();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
       child: Container(
         width: 38,
         height: 48,
@@ -866,43 +887,6 @@ class _PainFace extends StatelessWidget {
           color: _Sk.skin,
           borderRadius: BorderRadius.circular(19),
           border: Border.all(color: const Color(0xFFE8D0B4)),
-        ),
-        child: Stack(
-          children: [
-            if (lokasi.full)
-              Positioned.fill(
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(19),
-                    gradient: RadialGradient(
-                      radius: 1.1,
-                      colors: [
-                        _Sk.pain.withValues(alpha: 0.85),
-                        _Sk.pain.withValues(alpha: 0.25),
-                      ],
-                    ),
-                  ),
-                ),
-              )
-            else
-              for (final spot in lokasi.spots)
-                Align(
-                  alignment: spot,
-                  child: Container(
-                    width: 20,
-                    height: 20,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: RadialGradient(
-                        colors: [
-                          _Sk.pain.withValues(alpha: 0.9),
-                          _Sk.pain.withValues(alpha: 0.0),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-          ],
         ),
       ),
     );
