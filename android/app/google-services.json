@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "283085367518",
+    "project_id": "migracare-c8fbe",
+    "storage_bucket": "migracare-c8fbe.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:283085367518:android:f38bc0270e830567cdba4f",
+        "android_client_info": {
+          "package_name": "com.example.migracare"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDU-wqVAuhO9IFF7SAOTW2LPmmlWz9Av18"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

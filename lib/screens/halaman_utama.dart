@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'beranda.dart' hide AppColors;
 import 'konsultasi.dart';
 import 'skrining.dart';
+import 'riwayat.dart';
 import '../theme.dart';
 import 'profil.dart' hide AppColors;
 
@@ -26,9 +27,9 @@ class _HalamanUtamaState extends State<HalamanUtama> {
         index: _index,
         children: [
           BerandaPage(onBukaSkrining: () => _pindahTab(1)),
-          const SkriningPage(),
+          SkriningPage(onSelesai: () => _pindahTab(3)),
           KonsultasiScreen(),
-          const _Placeholder('Riwayat'),
+          RiwayatPage(onBukaSkrining: () => _pindahTab(1)),
           const ProfilPage(),
         ],
       ),
@@ -68,30 +69,6 @@ class _HalamanUtamaState extends State<HalamanUtama> {
             label: 'Profil',
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _Placeholder extends StatelessWidget {
-  const _Placeholder(this.judul);
-
-  final String judul;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.construction_rounded, size: 44, color: AppColors.textGrey),
-            const SizedBox(height: 10),
-            Text('Halaman $judul belum dibuat',
-                style: const TextStyle(fontSize: 13, color: AppColors.textGrey)),
-          ],
-        ),
       ),
     );
   }
