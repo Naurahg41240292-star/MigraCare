@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'halaman_utama.dart';
 import 'daftar.dart';
+import 'lupa_password.dart';
 
 /// ==========================================================================
 ///  MIGRACARE — Halaman Masuk (Login)
@@ -187,14 +188,11 @@ class _MasukPageState extends State<MasukPage> {
                   ),
                   const Spacer(),
                   TextButton(
-                    onPressed: () =>
-                        _showSnack('Fitur lupa password segera hadir 😊'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: _Mk.gold,
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const LupaPasswordPage()),
+                      );
+                    },
                     child: const Text(
                       'Lupa Password?',
                       style: TextStyle(
