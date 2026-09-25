@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'halaman_utama.dart';
 import 'daftar.dart';
 import 'lengkapi_profil.dart';
+import 'lupa_password.dart';
 import '../services/profil_service.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 
 /// ==========================================================================
 ///  MIGRACARE — Halaman Masuk (Login)
@@ -112,79 +113,6 @@ class _MasukPageState extends State<MasukPage> {
     }
   }
 
-  // ---------------- LUPA PASSWORD (kirim link reset ke email) ----------------
-  Future<void> _lupaPassword() async {
-    final emailCtrl = TextEditingController();
-    final konfirmasi = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
-          'Lupa Password?',
-          style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: _Mk.textDark),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Masukkan email akun Anda. Kami akan mengirim tautan '
-              'untuk mengatur ulang password.',
-              style: TextStyle(fontSize: 12.5, color: _Mk.textGrey),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: emailCtrl,
-              keyboardType: TextInputType.emailAddress,
-              style: const TextStyle(fontSize: 13, color: _Mk.textDark),
-              decoration: _inputDecoration('Masukkan email.'),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Batal', style: TextStyle(color: _Mk.textGrey)),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _Mk.button,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
-            ),
-            child: const Text('Kirim'),
-          ),
-        ],
-      ),
-    );
-
-    if (konfirmasi != true) return;
-    final email = emailCtrl.text.trim();
-    if (email.isEmpty) {
-      _showSnack('Email wajib diisi');
-      return;
-    }
-
-    try {
-      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
-      if (mounted) {
-        _showSnack('Tautan reset password sudah dikirim ke $email');
-      }
-    } on FirebaseAuthException catch (e) {
-      if (mounted) _showSnack(_pesanError(e.code));
-    } catch (e) {
-      if (mounted) _showSnack('ERROR: $e');
-    }
-  }
-
   // ================= LOGIN DENGAN GOOGLE =================
   Future<void> _masukDenganGoogle() async {
     setState(() => _loading = true);
@@ -222,7 +150,6 @@ class _MasukPageState extends State<MasukPage> {
       if (mounted) setState(() => _loading = false);
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -344,7 +271,12 @@ class _MasukPageState extends State<MasukPage> {
                   ),
                   const Spacer(),
                   TextButton(
-                    onPressed: _lupaPassword,
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                            builder: (_) => const LupaPasswordPage()),
+                      );
+                    },
                     style: TextButton.styleFrom(
                       foregroundColor: _Mk.gold,
                       padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -395,6 +327,7 @@ class _MasukPageState extends State<MasukPage> {
                         ),
                 ),
               ),
+              const SizedBox(height: 14),
 
               // ---------------- CONTINUE WITH GOOGLE -------------------------
               SizedBox(
@@ -420,8 +353,6 @@ class _MasukPageState extends State<MasukPage> {
                   ),
                 ),
               ),
-              const SizedBox(height: 18),
-
               const SizedBox(height: 18),
 
               // ---------------- Daftar di sini -------------------------------
