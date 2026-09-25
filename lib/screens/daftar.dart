@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import 'masuk.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'lengkapi_profil.dart';
 
 /// ==========================================================================
 ///  MIGRACARE — Halaman Buat Akun (Registrasi)
@@ -33,6 +35,7 @@ class _DaftarPageState extends State<DaftarPage> {
   bool _obscurePassword = true;
   bool _obscureKonfirmasi = true;
   bool _setuju = false;
+  bool _loading = false;
 
   @override
   void dispose() {
@@ -101,101 +104,143 @@ class _DaftarPageState extends State<DaftarPage> {
     return null;
   }
 
+  String _pesanError(String code) {
+    switch (code) {
+      case 'email-already-in-use':
+        return 'Email sudah terdaftar. Silakan masuk';
+      case 'invalid-email':
+        return 'Format email tidak valid';
+      case 'weak-password':
+        return 'Password terlalu lemah, minimal 6 karakter';
+      case 'network-request-failed':
+        return 'Tidak ada koneksi internet';
+      default:
+        return 'Gagal mendaftar ($code)';
+    }
+  }
+
   // -------------------------------------------------------------------------
-  //  AKSI DAFTAR
+  //  AKSI DAFTAR — buat akun di Firebase Auth + simpan profil awal ke Firestore
   // -------------------------------------------------------------------------
-  void _daftar() {
-    // Checkbox dicek dulu (di luar form)
+  Future<void> _daftar() async {
     if (!_setuju) {
       _showSnack('Centang "Saya menyetujui syarat dan ketentuan" dulu ya.');
       return;
     }
 
-    // Validasi seluruh form
     if (!_formKey.currentState!.validate()) {
       _showSnack('Periksa kembali data yang diisi.');
       return;
     }
 
-    // TODO: kirim data ke server/Firebase di sini.
-    // Untuk sekarang: tampilkan dialog sukses → arahkan ke halaman Masuk.
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-          ),
-          title: Column(
-            children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFFDF3D7),
-                  shape: BoxShape.circle,
+    setState(() => _loading = true);
+    try {
+      final email = _emailController.text.trim();
+      final password = _passwordController.text;
+
+      // 1. Buat akun di Firebase Auth
+      final cred = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(email: email, password: password);
+      final uid = cred.user!.uid;
+
+      // 2. Simpan nama & username ke Firestore (users/{uid})
+      await FirebaseFirestore.instance.collection('users').doc(uid).set({
+        'akun': {
+          'namaLengkap': _namaController.text.trim(),
+          'username': _usernameController.text.trim(),
+          'email': email,
+          'dibuatPada': FieldValue.serverTimestamp(),
+        },
+      }, SetOptions(merge: true));
+
+      if (!mounted) return;
+
+      // 3. Dialog sukses (desain punyamu dipertahankan)
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) {
+          return AlertDialog(
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+            ),
+            title: Column(
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFFDF3D7),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.check_rounded,
+                    color: Color(0xFFC99A2C),
+                    size: 32,
+                  ),
                 ),
-                child: const Icon(
-                  Icons.check_rounded,
-                  color: Color(0xFFC99A2C),
-                  size: 32,
+                const SizedBox(height: 12),
+                const Text(
+                  'Akun Berhasil Dibuat!',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: _Dr.textDark,
+                  ),
                 ),
+              ],
+            ),
+            content: const Text(
+              'Selamat bergabung di MigraCare. Lengkapi profil Anda untuk memulai.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12.5,
+                height: 1.5,
+                color: _Dr.textGrey,
               ),
-              const SizedBox(height: 12),
-              const Text(
-                'Akun Berhasil Dibuat!',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: _Dr.textDark,
+            ),
+            actionsAlignment: MainAxisAlignment.center,
+            actions: [
+              SizedBox(
+                width: 160,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _Dr.button,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    'Lanjutkan',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                  ),
                 ),
               ),
             ],
-          ),
-          content: const Text(
-            'Selamat bergabung di MigraCare. Silakan masuk dengan akun Anda.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 12.5,
-              height: 1.5,
-              color: _Dr.textGrey,
-            ),
-          ),
-          actionsAlignment: MainAxisAlignment.center,
-          actions: [
-            SizedBox(
-              width: 160,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pop(); // tutup dialog
-                  // Kembali ke halaman Masuk (bersihkan tumpukan daftar)
-                  Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(builder: (_) => const MasukPage()),
-                    (route) => false,
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _Dr.button,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text(
-                  'Masuk Sekarang',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
+          );
+        },
+      );
+
+      if (!mounted) return;
+
+      // 4. Lanjut ke onboarding: Lengkapi Profil → Syarat & Ketentuan
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LengkapiProfilPage()),
+        (route) => false,
+      );
+    } on FirebaseAuthException catch (e) {
+      if (mounted) _showSnack(_pesanError(e.code));
+    } catch (e) {
+      if (mounted) _showSnack('ERROR: $e');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   void _showSnack(String message) {
@@ -271,8 +316,7 @@ class _DaftarPageState extends State<DaftarPage> {
                   textCapitalization: TextCapitalization.words,
                   validator: _validasiNama,
                   style: const TextStyle(fontSize: 13, color: _Dr.textDark),
-                  decoration:
-                      _inputDecoration('Masukkan nama lengkap'),
+                  decoration: _inputDecoration('Masukkan nama lengkap'),
                 ),
                 const SizedBox(height: 18),
 
@@ -335,8 +379,8 @@ class _DaftarPageState extends State<DaftarPage> {
                   decoration:
                       _inputDecoration('Konfirmasi password').copyWith(
                     suffixIcon: IconButton(
-                      onPressed: () => setState(() =>
-                          _obscureKonfirmasi = !_obscureKonfirmasi),
+                      onPressed: () => setState(
+                          () => _obscureKonfirmasi = !_obscureKonfirmasi),
                       icon: Icon(
                         _obscureKonfirmasi
                             ? Icons.visibility_off_outlined
@@ -397,20 +441,31 @@ class _DaftarPageState extends State<DaftarPage> {
                   width: double.infinity,
                   height: 54,
                   child: ElevatedButton(
-                    onPressed: _daftar,
+                    onPressed: _loading ? null : _daftar,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _Dr.button,
                       foregroundColor: Colors.white,
+                      disabledBackgroundColor:
+                          _Dr.button.withValues(alpha: 0.6),
                       elevation: 0,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
                       ),
                     ),
-                    child: const Text(
-                      'Daftar',
-                      style: TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.w700),
-                    ),
+                    child: _loading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.4,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text(
+                            'Daftar',
+                            style: TextStyle(
+                                fontSize: 16, fontWeight: FontWeight.w700),
+                          ),
                   ),
                 ),
                 const SizedBox(height: 24),
