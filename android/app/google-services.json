@@ -12,7 +12,20 @@
           "package_name": "com.example.migracare"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "283085367518-17ru0ndheu0b4lgb70q4pbm27e4br8dg.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.migracare",
+            "certificate_hash": "22fb7506679199c2a066d2ebe3cd9388f90c6499"
+          }
+        },
+        {
+          "client_id": "283085367518-3hgs3k8mue5lakd4se8pi4g85ju9896b.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDU-wqVAuhO9IFF7SAOTW2LPmmlWz9Av18"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "283085367518-3hgs3k8mue5lakd4se8pi4g85ju9896b.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
