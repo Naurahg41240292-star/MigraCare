@@ -1,9 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'onboarding.dart';
-
+import 'package:firebase_auth/firebase_auth.dart';
+import '../services/profil_service.dart';
+import 'halaman_utama.dart';
+import 'lengkapi_profil.dart';
+import 'admin_beranda.dart';
+import 'dokter_panel.dart';
 /// ==========================================================================
-///  MIGRACARE — Splash Screen v3 (latar gradasi menyatu + animasi)
+///  MIGRACARE — Splash Screen v4
+///  - Sudah login  → otomatis masuk HalamanUtama (m-banking style)
+///  - Belum login  → tunggu swipe/tap → Onboarding
 ///  File: lib/screens/splash.dart
 /// ==========================================================================
 
@@ -33,6 +40,10 @@ class _SplashScreenState extends State<SplashScreen>
   double _dragDy = 0;
   bool _dragging = false;
   bool _navigated = false;
+
+  // ====== HASIL CEK SESI (dijalankan paralel dengan animasi) ======
+  Widget? _tujuanSesi;      // null = belum login / belum selesai cek
+  bool _sesiSelesai = false;
 
   @override
   void initState() {
@@ -77,6 +88,8 @@ class _SplashScreenState extends State<SplashScreen>
     );
 
     _entrance.forward();
+    // ✅ Saat animasi masuk selesai → coba auto-pindah (kalau sudah login)
+    _entrance.addStatusListener(_onEntranceStatus);
 
     _float = AnimationController(
       vsync: this,
@@ -91,15 +104,83 @@ class _SplashScreenState extends State<SplashScreen>
       lowerBound: 0,
       upperBound: 1,
     )..repeat(reverse: true);
+
+    // ✅ Mulai cek sesi SEKARANG — paralel dengan animasi splash
+    _cekSesi();
   }
 
-  void _go() {
+  void _onEntranceStatus(AnimationStatus status) {
+    if (status == AnimationStatus.completed) {
+      _cobaAutoPindah();
+    }
+  }
+
+    // ================= CEK SESI (paralel dengan animasi) =================
+  Future<void> _cekSesi() async {
+    Widget? tujuan;
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        tujuan = null; // belum login → tetap di splash (tunggu swipe)
+      } else {
+        // ✅ CEK ROLE DULU: admin → PanelAdmin, dokter → PanelDokter
+        final role = await ProfilService.instance.ambilRole();
+
+        if (role == 'admin') {
+          tujuan = const AdminBerandaPage();
+        } else if (role == 'dokter') {
+          tujuan = const DokterPanelPage();
+        } else {
+          // pasien → cek onboarding seperti sebelumnya
+          final sudah = await ProfilService.instance.sudahOnboarding();
+          tujuan = sudah
+              ? const HalamanUtama()
+              : const LengkapiProfilPage();
+        }
+      }
+    } catch (_) {
+      tujuan = null;
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _tujuanSesi = tujuan;
+      _sesiSelesai = true;
+    });
+    _cobaAutoPindah();
+  }
+  // ============ AUTO-PINDAH: sudah login + animasi selesai ============
+  void _cobaAutoPindah() {
+    if (_navigated) return;
+    if (!_sesiSelesai || _tujuanSesi == null) return; // belum login → jangan auto
+    if (!_entrance.isCompleted) return;               // biarkan animasi tuntas dulu
+    _pindah(_tujuanSesi!);
+  }
+
+  void _pindah(Widget page) {
     if (_navigated || !mounted) return;
     _navigated = true;
-    HapticFeedback.lightImpact();
     Navigator.of(context).pushReplacement(
-      _SlideUpRoute(page: const OnboardingPage()),
+      _SlideUpRoute(page: page),
     );
+  }
+
+  // ============ TAP / SWIPE di splash ============
+  void _go() {
+    if (_navigated || !mounted) return;
+
+    if (_sesiSelesai && _tujuanSesi != null) {
+      // Sudah login → langsung ke tujuan (skip sisa animasi)
+      HapticFeedback.lightImpact();
+      _pindah(_tujuanSesi!);
+    } else {
+      // Belum login (atau cek belum selesai) → onboarding
+      _navigated = true;
+      HapticFeedback.lightImpact();
+      Navigator.of(context).pushReplacement(
+        _SlideUpRoute(page: const OnboardingPage()),
+      );
+    }
   }
 
   void _onDragUpdate(DragUpdateDetails d) {
@@ -165,7 +246,6 @@ class _SplashScreenState extends State<SplashScreen>
               bottom: 0,
               height: 470,
               child: ShaderMask(
-                // Fade: 25% atas gelombang dibuat transparan bertahap
                 shaderCallback: (rect) => LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
@@ -242,8 +322,6 @@ class _SplashScreenState extends State<SplashScreen>
                               child: Stack(
                                 alignment: Alignment.center,
                                 children: [
-                                  // Halo glow lembut — warnanya menyatu
-                                  // dengan gradasi latar
                                   Container(
                                     width: 230,
                                     height: 230,
@@ -368,7 +446,7 @@ class _SplashScreenState extends State<SplashScreen>
 }
 
 // ===========================================================================
-//  TRANSISI HALUS ke Onboarding
+//  TRANSISI HALUS
 // ===========================================================================
 class _SlideUpRoute<T> extends PageRouteBuilder<T> {
   _SlideUpRoute({required Widget page})
@@ -396,12 +474,11 @@ class _SlideUpRoute<T> extends PageRouteBuilder<T> {
 }
 
 class _Sp {
-  // ---- Warna gradasi latar (atas → bawah, makin hangat) ----
   static const Color bgTop = Color(0xFFFDFBF7);
   static const Color bgMid = Color(0xFFFAF2E3);
   static const Color bgBottom = Color(0xFFF6E7C6);
 
-  static const Color bg = bgTop; // fallback
+  static const Color bg = bgTop;
   static const Color textDark = Color(0xFF3A3028);
   static const Color textGrey = Color(0xFF8A8178);
   static const Color indicator = Color(0xFFC5A46D);

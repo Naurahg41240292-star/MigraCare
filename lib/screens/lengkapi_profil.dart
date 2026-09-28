@@ -87,6 +87,12 @@ class _LengkapiProfilPageState extends State<LengkapiProfilPage> {
       return;
     }
 
+    // ✅ TAMBAH: validasi nomor telepon maksimal 13 digit
+    if (telepon.length > 13) {
+      _showSnack('Nomor telepon maksimal 13 digit');
+      return;
+    }
+
     setState(() => _menyimpan = true);
     try {
       final uid = await _ensureUid();
@@ -192,6 +198,7 @@ class _LengkapiProfilPageState extends State<LengkapiProfilPage> {
                 controller: _teleponController,
                 hint: 'Masukkan nomor telepon',
                 keyboardType: TextInputType.phone,
+                maxLength: 13, // ✅ TAMBAH: batasi 13 digit
               ),
               const SizedBox(height: 14),
 
@@ -330,12 +337,16 @@ class _LengkapiProfilPageState extends State<LengkapiProfilPage> {
     required TextEditingController controller,
     required String hint,
     TextInputType? keyboardType,
+    int? maxLength, // ✅ TAMBAH: parameter maxLength
   }) =>
       TextField(
         controller: controller,
         keyboardType: keyboardType,
+        maxLength: maxLength, // ✅ TAMBAH: terapkan
         style: const TextStyle(fontSize: 13, color: AppColors.textDark),
-        decoration: _dekorInput.copyWith(hintText: hint),
+        decoration: _dekorInput.copyWith(hintText: hint).copyWith(
+              counterText: '', // ✅ TAMBAH: sembunyikan counter 0/13
+            ),
       );
 }
 

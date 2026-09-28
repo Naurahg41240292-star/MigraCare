@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-/// Cek status onboarding user (profil + syarat & ketentuan)
+/// Service profil & role user
 class ProfilService {
   ProfilService._();
   static final ProfilService instance = ProfilService._();
@@ -13,13 +13,14 @@ class ProfilService {
     return cred.user!.uid;
   }
 
-  /// true = sudah lengkapi profil & setuju S&K → login langsung HalamanUtama
-  /// false = perlu lewat LengkapiProfil → SyaratKetentuan dulu
+  /// true = profil lengkap + sudah setuju S&K → login langsung HalamanUtama
   Future<bool> sudahOnboarding() async {
     try {
       final uid = await _ensureUid();
-      final doc =
-          await FirebaseFirestore.instance.collection('users').doc(uid).get();
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .get();
       if (!doc.exists) return false;
 
       final data = doc.data()!;
@@ -31,17 +32,17 @@ class ProfilService {
     }
   }
 
-  /// Ambil nama depan user untuk sapaan beranda
-  /// (mis. "Intan Novitasari" → "Intan")
+  /// Ambil nama depan untuk sapaan beranda ("Intan Novitasari" → "Intan")
   Future<String> ambilNama() async {
     try {
       final uid = await _ensureUid();
-      final doc =
-          await FirebaseFirestore.instance.collection('users').doc(uid).get();
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .get();
       if (!doc.exists) return 'Sahabat';
 
       final data = doc.data()!;
-      // Prioritas: profile.namaLengkap → akun.namaLengkap (dari daftar)
       final nama = (data['profile']?['namaLengkap'] ??
               data['akun']?['namaLengkap'] ??
               '') as String;
@@ -50,6 +51,20 @@ class ProfilService {
       return nama.trim().split(' ').first;
     } catch (_) {
       return 'Sahabat';
+    }
+  }
+
+  /// Ambil role user: "pasien" (default) | "dokter" | "admin"
+  Future<String> ambilRole() async {
+    try {
+      final uid = await _ensureUid();
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .get();
+      return (doc.data()?['role'] ?? 'pasien') as String;
+    } catch (_) {
+      return 'pasien';
     }
   }
 }
