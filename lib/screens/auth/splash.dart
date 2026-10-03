@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'onboarding.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../services/profil_service.dart';
-import 'halaman_utama.dart';
-import 'lengkapi_profil.dart';
-import 'admin_beranda.dart';
-import 'dokter_panel.dart';
+import '../../services/profil_service.dart';
+import '../halaman_utama.dart';
+import '../lengkapi_profil.dart';
+import '../admin/admin_beranda.dart';
+import '../dokter_panel.dart';
 /// ==========================================================================
 ///  MIGRACARE — Splash Screen v4
 ///  - Sudah login  → otomatis masuk HalamanUtama (m-banking style)

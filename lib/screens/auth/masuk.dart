@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'halaman_utama.dart';
+import '../halaman_utama.dart';
 import 'daftar.dart';
 import 'lupa_password.dart';
-import 'admin_panel.dart';
-import 'dokter_panel.dart';
-import 'lengkapi_profil.dart';
-import '../services/profil_service.dart';
+import '../admin/admin_beranda.dart';
+import '../dokter_panel.dart';
+import '../lengkapi_profil.dart';
+import '../../services/profil_service.dart';
 
 /// ==========================================================================
 ///  MIGRACARE — Halaman Masuk (Login)
@@ -80,7 +80,7 @@ class _MasukPageState extends State<MasukPage> {
 
     Widget tujuan;
     if (role == 'admin') {
-      tujuan = const AdminPanelPage();
+      tujuan = const AdminBerandaPage();
     } else if (role == 'dokter') {
       tujuan = const DokterPanelPage();
     } else {

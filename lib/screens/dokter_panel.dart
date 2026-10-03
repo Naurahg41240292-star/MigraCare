@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'masuk.dart';
+import 'auth/masuk.dart';
 
 abstract class _Dk {
   static const Color bg = Color(0xFFFAF4EA);

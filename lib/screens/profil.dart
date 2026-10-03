@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/profil_pengguna.dart';
 import 'edit_profil.dart';
-import 'masuk.dart';
+import 'auth/masuk.dart';
 import 'pengaturan_notifikasi.dart' hide AppColors;
 import 'tentang.dart' hide AppColors;
 
