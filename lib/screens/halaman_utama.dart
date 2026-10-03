@@ -18,7 +18,9 @@ class HalamanUtama extends StatefulWidget {
 class _HalamanUtamaState extends State<HalamanUtama> {
   int _index = 0;
 
-  void _pindahTab(int i) => setState(() => _index = i);
+  void _pindahTab(int i) {
+    setState(() => _index = i);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,13 +28,31 @@ class _HalamanUtamaState extends State<HalamanUtama> {
       body: IndexedStack(
         index: _index,
         children: [
-          BerandaPage(onBukaSkrining: () => _pindahTab(1)),
-          SkriningPage(onSelesai: () => _pindahTab(3)),
+          // TAB 0 — BERANDA
+          BerandaPage(
+            onBukaSkrining: () => _pindahTab(1),
+          ),
+
+          // TAB 1 — SKRINING
+          SkriningPage(
+            onKembali: () => _pindahTab(0),
+            onSelesai: () => _pindahTab(3),
+          ),
+
+          // TAB 2 — KONSULTASI
           KonsultasiScreen(),
-          RiwayatPage(onBukaSkrining: () => _pindahTab(1)),
+
+          // TAB 3 — RIWAYAT
+          RiwayatPage(
+            onKembali: () => _pindahTab(0),
+            onBukaSkrining: () => _pindahTab(1),
+          ),
+
+          // TAB 4 — PROFIL
           const ProfilPage(),
         ],
       ),
+
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _index,
         onTap: _pindahTab,
@@ -73,3 +93,4 @@ class _HalamanUtamaState extends State<HalamanUtama> {
     );
   }
 }
+

@@ -4,8 +4,13 @@ import '../services/riwayat_service.dart';
 import 'detail_riwayat_skrining.dart';
 
 class RiwayatPage extends StatefulWidget {
-  const RiwayatPage({super.key, this.onBukaSkrining});
+  const RiwayatPage({
+    super.key,
+    this.onKembali,
+    this.onBukaSkrining,
+  });
 
+  final VoidCallback? onKembali;
   final VoidCallback? onBukaSkrining;
 
   @override
@@ -90,16 +95,16 @@ class _RiwayatPageState extends State<RiwayatPage> {
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
               child: Row(
                 children: [
-                  if (canPop) ...[
+                  if (widget.onKembali != null) ...[
                     IconButton(
                       icon: const Icon(Icons.arrow_back_rounded),
                       color: AppColors.textDark,
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                    const SizedBox(width: 12),
-                  ],
+                      onPressed: () => widget.onKembali?.call(),
+                      ),
+                      const SizedBox(width: 12),
+                    ],
                   const Text(
                     'Riwayat',
                     style: TextStyle(
