@@ -26,16 +26,18 @@ abstract class AppColors {
 }
 
 class ProfilPage extends StatefulWidget {
-  const ProfilPage({super.key});
+  final VoidCallback? onKembali;
+
+  const ProfilPage({
+    super.key,
+    this.onKembali,
+  });
 
   @override
   State<ProfilPage> createState() => _ProfilPageState();
 }
 
 class _ProfilPageState extends State<ProfilPage> {
-  String _tema = 'Terang';
-  String _bahasa = 'Bahasa Indonesia';
-
   // ====== DATA USER DARI FIREBASE ======
   String _nama = '...';
   String _email = '...';
@@ -159,91 +161,6 @@ class _ProfilPageState extends State<ProfilPage> {
     );
   }
 
-  Future<void> _pilihTema() async {
-    final pilih = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Pilih Tema',
-                style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textDark),
-              ),
-              const SizedBox(height: 8),
-              ...['Terang', 'Gelap', 'Sistem'].map(
-                (t) => RadioListTile<String>(
-                  value: t,
-                  groupValue: _tema,
-                  activeColor: AppColors.accentDark,
-                  title: Text(t,
-                      style: const TextStyle(
-                          fontSize: 13.5, color: AppColors.textDark)),
-                  onChanged: (v) => Navigator.pop(context, v),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-    if (pilih != null) setState(() => _tema = pilih);
-  }
-
-  Future<void> _pilihBahasa() async {
-    final pilih = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Pilih Bahasa',
-                style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textDark),
-              ),
-              const SizedBox(height: 8),
-              RadioListTile<String>(
-                value: 'Bahasa Indonesia',
-                groupValue: _bahasa,
-                activeColor: AppColors.accentDark,
-                title: const Text('Bahasa Indonesia',
-                    style: TextStyle(
-                        fontSize: 13.5, color: AppColors.textDark)),
-                onChanged: (v) => Navigator.pop(context, v),
-              ),
-              const ListTile(
-                enabled: false,
-                title: Text('English (segera hadir)',
-                    style: TextStyle(fontSize: 13.5)),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-    if (pilih != null) setState(() => _bahasa = pilih);
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -256,18 +173,36 @@ class _ProfilPageState extends State<ProfilPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // ================= HEADER =================
-              const Text(
-                'Profil',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textDark,
-                ),
+              Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back_rounded),
+                    color: AppColors.textDark,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    onPressed: () => widget.onKembali?.call(),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'Profil',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textDark,
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 4),
-              const Text(
-                'Kelola akun dan pengaturan privasi anda',
-                style: TextStyle(fontSize: 12.5, color: AppColors.textGrey),
+              const Padding(
+                padding: EdgeInsets.only(left: 44),
+                child: Text(
+                  'Kelola akun dan pengaturan privasi anda',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: AppColors.textGrey,
+                  ),
+                ),
               ),
               const SizedBox(height: 16),
 
@@ -371,24 +306,6 @@ class _ProfilPageState extends State<ProfilPage> {
                         builder: (_) => const PengaturanNotifikasiPage()),
                   );
                 },
-              ),
-              _MenuSetting(
-                icon: Icons.grid_view_rounded,
-                iconBg: const Color(0xFFFDF3D7),
-                iconColor: const Color(0xFFC99A2C),
-                judul: 'Tema',
-                sub: 'Pilih tampilan aplikasi MigraCare',
-                nilai: _tema,
-                onTap: _pilihTema,
-              ),
-              _MenuSetting(
-                icon: Icons.public_rounded,
-                iconBg: const Color(0xFFFDF3D7),
-                iconColor: const Color(0xFFC99A2C),
-                judul: 'Bahasa',
-                sub: 'Pilih bahasa aplikasi',
-                nilai: _bahasa,
-                onTap: _pilihBahasa,
               ),
               _MenuSetting(
                 icon: Icons.lock_rounded,

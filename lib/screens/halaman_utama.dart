@@ -40,7 +40,9 @@ class _HalamanUtamaState extends State<HalamanUtama> {
           ),
 
           // TAB 2 — KONSULTASI
-          KonsultasiScreen(),
+          KonsultasiScreen(
+            onKembali: () => _pindahTab(0),
+          ),
 
           // TAB 3 — RIWAYAT
           RiwayatPage(
@@ -49,7 +51,9 @@ class _HalamanUtamaState extends State<HalamanUtama> {
           ),
 
           // TAB 4 — PROFIL
-          const ProfilPage(),
+ProfilPage(
+  onKembali: () => _pindahTab(0),
+),
         ],
       ),
 

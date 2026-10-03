@@ -570,17 +570,12 @@ class _SkriningPageState extends State<SkriningPage> {
               Row(
                 children: [
                   IconButton(
-                    onPressed: () {
-  widget.onKembali?.call();
-},
-                    icon: const Icon(
-                      Icons.arrow_back_ios_new_rounded,
-                      size: 20,
-                    ),
-                    color: AppColors.textDark,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
+  icon: const Icon(Icons.arrow_back_rounded),
+  color: AppColors.textDark,
+  padding: EdgeInsets.zero,
+  constraints: const BoxConstraints(),
+  onPressed: () => widget.onKembali?.call(),
+),
                   const SizedBox(width: 12),
                   const Text(
                     'Migraine Monitor',
