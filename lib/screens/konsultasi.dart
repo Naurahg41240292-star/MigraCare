@@ -8,7 +8,12 @@ import 'chat_konsultasi.dart';
 import 'detail_dokter.dart';
 
 class KonsultasiScreen extends StatefulWidget {
-  const KonsultasiScreen({super.key});
+  final VoidCallback? onKembali;
+
+  const KonsultasiScreen({
+    super.key,
+    this.onKembali,
+  });
 
   @override
   State<KonsultasiScreen> createState() => _KonsultasiScreenState();
@@ -61,38 +66,87 @@ class _KonsultasiScreenState extends State<KonsultasiScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 10, 20, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Hai, Ananda! 👋', style: TextStyle(
-                      fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.primary)),
-                  SizedBox(height: 4),
-                  Text('Sehat hari ini, langkah baik untuk esok.',
-                      style: TextStyle(fontSize: 13, color: AppColors.textSoft)),
-                ],
-              ),
+Widget build(BuildContext context) {
+  return Scaffold(
+    backgroundColor: AppColors.bg,
+    body: SafeArea(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // TOMBOL BACK → KEMBALI KE BERANDA
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 6, 20, 0),
+            child: Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back_rounded),
+                  color: AppColors.textDark,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  onPressed: () => widget.onKembali?.call(),
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  'Konsultasi',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textDark,
+                  ),
+                ),
+              ],
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-              child: _kolomCari(),
-            ),
-            SizedBox(height: 52, child: _chipBar()),
-            Expanded(child: _tampilkanRiwayat ? _listRiwayat() : _listDokter()),
-          ],
-        ),
-      ),
-    );
-  }
+          ),
 
+          // SAPAAN
+          const Padding(
+            padding: EdgeInsets.fromLTRB(20, 10, 20, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Hai, Ananda! 👋',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.primary,
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'Sehat hari ini, langkah baik untuk esok.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSoft,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // SEARCH
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+            child: _kolomCari(),
+          ),
+
+          // FILTER CHIP
+          SizedBox(
+            height: 52,
+            child: _chipBar(),
+          ),
+
+          // DAFTAR DOKTER / RIWAYAT
+          Expanded(
+            child: _tampilkanRiwayat
+                ? _listRiwayat()
+                : _listDokter(),
+          ),
+        ],
+      ),
+    ),
+  );
+}
   Widget _kolomCari() {
     return TextField(
       onChanged: (v) => setState(() => _query = v),
