@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 /// ==========================================================================
 ///  MIGRACARE — Halaman Lupa Password (Reset Password)
 ///  File: lib/screens/lupa_password.dart
-///  (Tombol "Kembali ke Masuk" di bawah sudah dihapus)
+///  ✅ Terhubung Firebase Auth: email reset password benar-benar terkirim
 /// ==========================================================================
 
 abstract class _Lp {
@@ -60,16 +61,44 @@ class _LupaPasswordPageState extends State<LupaPasswordPage>
     return RegExp(r'^[\w\.\-]+@([\w\-]+\.)+[\w\-]{2,4}$').hasMatch(email);
   }
 
-  void _kirimTautan() {
+  void _showSnack(String m) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text(m),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ));
+  }
+
+  String _pesanError(String code) {
+    switch (code) {
+      case 'invalid-email':
+        return 'Format email tidak valid';
+      case 'user-not-found':
+        return 'Email tidak terdaftar di MigraCare';
+      case 'network-request-failed':
+        return 'Tidak ada koneksi internet';
+      case 'too-many-requests':
+        return 'Terlalu banyak percobaan. Coba lagi nanti';
+      default:
+        return 'Gagal mengirim tautan ($code)';
+    }
+  }
+
+  // ================= KIRIM TAUTAN RESET (Firebase Auth asli) =================
+  Future<void> _kirimTautan() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _mengirim = true);
+    try {
+      // Kirim email reset password yang SEBENARNYA via Firebase
+      await FirebaseAuth.instance
+          .sendPasswordResetEmail(email: _emailC.text.trim());
 
-    // Simulasi pengiriman (nanti diganti Firebase Auth / backend)
-    Future.delayed(const Duration(milliseconds: 1200), () {
       if (!mounted) return;
-      setState(() => _mengirim = false);
 
+      // Dialog sukses — desain punyamu dipertahankan
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -119,7 +148,6 @@ class _LupaPasswordPageState extends State<LupaPasswordPage>
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    // Cukup menutup dialog — kembali ke Masuk lewat ← di kiri atas
                     onPressed: () => Navigator.of(dialogContext).pop(),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _Lp.button1,
@@ -144,7 +172,15 @@ class _LupaPasswordPageState extends State<LupaPasswordPage>
           ),
         ),
       );
-    });
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      _showSnack(_pesanError(e.code));
+    } catch (e) {
+      if (!mounted) return;
+      _showSnack('ERROR: $e');
+    } finally {
+      if (mounted) setState(() => _mengirim = false);
+    }
   }
 
   @override
