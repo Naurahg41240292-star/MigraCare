@@ -6,7 +6,7 @@ import '../../services/profil_service.dart';
 import '../halaman_utama.dart';
 import '../lengkapi_profil.dart';
 import '../admin/admin_beranda.dart';
-import '../dokter_panel.dart';
+import '../dokter/dokter_panel.dart';
 /// ==========================================================================
 ///  MIGRACARE — Splash Screen v4
 ///  - Sudah login  → otomatis masuk HalamanUtama (m-banking style)

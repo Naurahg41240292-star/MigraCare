@@ -5,7 +5,7 @@ import '../halaman_utama.dart';
 import 'daftar.dart';
 import 'lupa_password.dart';
 import '../admin/admin_beranda.dart';
-import '../dokter_panel.dart';
+import '../dokter/dokter_panel.dart';
 import '../lengkapi_profil.dart';
 import '../../services/profil_service.dart';
 
