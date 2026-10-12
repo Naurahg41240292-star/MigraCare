@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
-import 'informasi_layanan.dart'; // pakai AppColors, Layanan, _SmartImage? (lihat catatan)
+import 'informasi_layanan.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// ==========================================================================
 ///  MIGRACARE — Halaman Detail Layanan
 ///  File: lib/screens/detail_layanan.dart
+///  (Section ulasan pasien sudah dihapus)
 /// ==========================================================================
 
 class DetailLayananPage extends StatefulWidget {
@@ -33,27 +34,25 @@ class _DetailLayananPageState extends State<DetailLayananPage> {
         ),
       );
   }
+
   // ============ BUKA GOOGLE MAPS DENGAN ALAMAT LAYANAN ============
   Future<void> _bukaGoogleMaps(String alamat) async {
-    // Encode alamat agar aman dipakai sebagai URL (spasi → %20, dll)
     final query = Uri.encodeComponent(alamat);
-    // URL resmi Google Maps: otomatis buka aplikasi Maps di HP,
-    // atau browser jika aplikasi Maps tidak ada
     final url = Uri.parse(
       'https://www.google.com/maps/search/?api=1&query=$query',
     );
     try {
       final berhasil = await launchUrl(
         url,
-        mode: LaunchMode.externalApplication, // pakai app Maps/browser, bukan webview
+        mode: LaunchMode.externalApplication,
       );
       if (!berhasil && mounted) {
         _showSnack('Tidak bisa membuka Google Maps');
       }
     } catch (e) {
       if (mounted) _showSnack('Google Maps tidak tersedia di perangkat ini');
+    }
   }
-}
 
   // ============ AKSI KLIK: Alamat / Jam Operasional / Kontak ============
   void _openInfoSheet(_InfoType type) {
@@ -92,7 +91,6 @@ class _DetailLayananPageState extends State<DetailLayananPage> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                // Isi sesuai tipe
                 if (type == _InfoType.alamat) ...[
                   Text(
                     l.location,
@@ -135,7 +133,7 @@ class _DetailLayananPageState extends State<DetailLayananPage> {
                     icon: Icons.phone_rounded,
                     label: 'Telepon',
                     value: l.phone,
-                    onTap: () => _showSnack('Menghubungi $l.phone...'),
+                    onTap: () => _showSnack('Menghubungi ${l.phone}...'),
                   ),
                   _InfoRow(
                     icon: Icons.chat_rounded,
@@ -150,53 +148,6 @@ class _DetailLayananPageState extends State<DetailLayananPage> {
                     onTap: () => _showSnack('Membuka email... (segera)'),
                   ),
                 ],
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  // ============================ SHEET ULASAN ============================
-  void _openUlasanSheet() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppColors.background,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: AppColors.outline,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Ulasan Pasien',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textDark,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                ...sampleUlasan.map(
-                  (u) => _UlasanCard(ulasan: u),
-                ),
               ],
             ),
           ),
@@ -227,12 +178,13 @@ class _DetailLayananPageState extends State<DetailLayananPage> {
                       icon: const Icon(Icons.arrow_back_rounded),
                       color: AppColors.darkBrown,
                     ),
-                    // ⭐ TOMBOL LOVE — bisa diklik, berubah merah
                     GestureDetector(
                       onTap: () {
                         setState(() => _isLiked = !_isLiked);
                         _showSnack(
-                          _isLiked ? 'Ditambahkan ke favorit ❤️' : 'Dihapus dari favorit',
+                          _isLiked
+                              ? 'Ditambahkan ke favorit ❤️'
+                              : 'Dihapus dari favorit',
                         );
                       },
                       child: AnimatedContainer(
@@ -435,46 +387,6 @@ class _DetailLayananPageState extends State<DetailLayananPage> {
                       .toList(),
                 ),
               ),
-              const SizedBox(height: 24),
-
-              // ================= ULASAN PASIEN =================
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Ulasan Pasien',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textDark,
-                      ),
-                    ),
-                    TextButton.icon(
-                      onPressed: _openUlasanSheet,
-                      style: TextButton.styleFrom(
-                        foregroundColor: AppColors.accentDark,
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      icon: const Text(
-                        'Lihat Semua',
-                        style: TextStyle(
-                            fontSize: 12, fontWeight: FontWeight.w600),
-                      ),
-                      label: const Icon(Icons.chevron_right_rounded,
-                          size: 18),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 10),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: _UlasanCard(ulasan: sampleUlasan.first),
-              ),
               const SizedBox(height: 28),
             ],
           ),
@@ -667,127 +579,6 @@ class _FullWidthButton extends StatelessWidget {
         label: Text(label,
             style: const TextStyle(
                 fontSize: 13, fontWeight: FontWeight.w700)),
-      ),
-    );
-  }
-}
-
-class Ulasan {
-  const Ulasan({
-    required this.nama,
-    required this.rating,
-    required this.tanggal,
-    required this.teks,
-    required this.inisial,
-  });
-
-  final String nama;
-  final double rating;
-  final String tanggal;
-  final String teks;
-  final String inisial;
-}
-
-const List<Ulasan> sampleUlasan = [
-  Ulasan(
-    nama: 'Rina Amalia',
-    rating: 5,
-    tanggal: '12 Jan 2026',
-    teks:
-        'Pelayanannya ramah, tunggu tidak lama, dan fasilitas lengkap. Dokternya juga sangat profesional.',
-    inisial: 'RA',
-  ),
-  Ulasan(
-    nama: 'Bagus Setiawan',
-    rating: 4,
-    tanggal: '3 Jan 2026',
-    teks:
-        'IGD-nya responsif 24 jam. Parkir agak penuh saat akhir pekan, tapi pelayanan medisnya bagus.',
-    inisial: 'BS',
-  ),
-  Ulasan(
-    nama: 'Siti Nurhaliza',
-    rating: 5,
-    tanggal: '28 Des 2025',
-    teks:
-        'Apoteknya lengkap dan petugas farmasi menjelaskan dosis obat dengan sabar. Recommended!',
-    inisial: 'SN',
-  ),
-];
-
-class _UlasanCard extends StatelessWidget {
-  const _UlasanCard({required this.ulasan});
-
-  final Ulasan ulasan;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.outline),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 18,
-                backgroundColor: const Color(0xFFFDF3D7),
-                child: Text(
-                  ulasan.inisial,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.accentDark,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  ulasan.nama,
-                  style: const TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textDark,
-                  ),
-                ),
-              ),
-              Text(
-                ulasan.tanggal,
-                style: const TextStyle(
-                    fontSize: 10.5, color: AppColors.textGrey),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: List.generate(
-              5,
-              (i) => Icon(
-                Icons.star_rounded,
-                size: 15,
-                color: i < ulasan.rating.round()
-                    ? const Color(0xFFF2B01E)
-                    : const Color(0xFFE5DCCB),
-              ),
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            ulasan.teks,
-            style: const TextStyle(
-              fontSize: 12,
-              height: 1.5,
-              color: AppColors.textGrey,
-            ),
-          ),
-        ],
       ),
     );
   }
