@@ -74,7 +74,7 @@ class _BerandaPageState extends State<BerandaPage> {
   static const List<_Service> _services = [
     _Service(
       name: 'RS AL Huda Banyuwangi',
-      location: 'Jl. Raya Watukebo No. 8',
+      location: 'RS Al-Huda, Jl. Raya Gambiran No. 225 Genteng, Dusun Krajan II, Gambiran, Kec. Gambiran, Kabupaten Banyuwangi, Jawa Timur 68465',
       distance: '± 3,2 km',
       rating: 4.7,
       reviews: 210,
@@ -84,7 +84,7 @@ class _BerandaPageState extends State<BerandaPage> {
     ),
     _Service(
       name: 'RS. Jember Klinik',
-      location: 'Jember, Jawa Timur',
+      location: 'Jl. Bedadung No.2, Kp. Using, Jemberlor, Kec. Patrang, Kabupaten Jember, Jawa Timur 68118',
       distance: '± 12 km',
       rating: 4.8,
       reviews: 150,

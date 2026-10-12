@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'informasi_layanan.dart'; // pakai AppColors, Layanan, _SmartImage? (lihat catatan)
+import 'package:url_launcher/url_launcher.dart';
 
 /// ==========================================================================
 ///  MIGRACARE — Halaman Detail Layanan
@@ -32,6 +33,27 @@ class _DetailLayananPageState extends State<DetailLayananPage> {
         ),
       );
   }
+  // ============ BUKA GOOGLE MAPS DENGAN ALAMAT LAYANAN ============
+  Future<void> _bukaGoogleMaps(String alamat) async {
+    // Encode alamat agar aman dipakai sebagai URL (spasi → %20, dll)
+    final query = Uri.encodeComponent(alamat);
+    // URL resmi Google Maps: otomatis buka aplikasi Maps di HP,
+    // atau browser jika aplikasi Maps tidak ada
+    final url = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=$query',
+    );
+    try {
+      final berhasil = await launchUrl(
+        url,
+        mode: LaunchMode.externalApplication, // pakai app Maps/browser, bukan webview
+      );
+      if (!berhasil && mounted) {
+        _showSnack('Tidak bisa membuka Google Maps');
+      }
+    } catch (e) {
+      if (mounted) _showSnack('Google Maps tidak tersedia di perangkat ini');
+  }
+}
 
   // ============ AKSI KLIK: Alamat / Jam Operasional / Kontak ============
   void _openInfoSheet(_InfoType type) {
@@ -81,8 +103,7 @@ class _DetailLayananPageState extends State<DetailLayananPage> {
                   _FullWidthButton(
                     label: 'Buka di Google Maps',
                     icon: Icons.map_rounded,
-                    onPressed: () =>
-                        _showSnack('Membuka Google Maps... (segera)'),
+                    onPressed: () => _bukaGoogleMaps(l.location),
                   ),
                 ] else if (type == _InfoType.jam) ...[
                   ...l.jamOperasional.entries.map(
