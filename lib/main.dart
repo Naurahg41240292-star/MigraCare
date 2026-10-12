@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
-import 'screens/splash.dart'; // ← dulu: screens/beranda.dart
+import 'screens/auth/splash.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();

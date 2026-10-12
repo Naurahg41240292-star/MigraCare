@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/artikel.dart';
+import '../services/profil_service.dart';
 import 'detail_artikel.dart';
 import 'skrining.dart';
 import 'pengingat_obat.dart';
@@ -50,10 +51,19 @@ class BerandaPage extends StatefulWidget {
 }
 
 class _BerandaPageState extends State<BerandaPage> {
+  String _nama = '';
+
   @override
   void initState() {
     super.initState();
     _muatDataPengingat();
+    _muatNama();
+  }
+
+  Future<void> _muatNama() async {
+    final nama = await ProfilService.instance.ambilNama();
+    if (!mounted) return;
+    setState(() => _nama = nama);
   }
 
   Future<void> _muatDataPengingat() async {
@@ -80,7 +90,7 @@ class _BerandaPageState extends State<BerandaPage> {
       reviews: 150,
       icon: Icons.local_hospital,
       imagePath:
-          'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=600&q=60',
+          'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0a?auto=format&fit=crop&w=600&q=60',
     ),
     _Service(
       name: 'Apotek K-24, Jl. Kalimantan',
@@ -359,7 +369,7 @@ class _BerandaPageState extends State<BerandaPage> {
     );
   }
 
-    @override
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -371,7 +381,7 @@ class _BerandaPageState extends State<BerandaPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 20),
-              const _GreetingHeader(),
+              _GreetingHeader(nama: _nama),
               const SizedBox(height: 20),
               _AiMigraineBanner(onMulaiSkrining: _bukaSkrining),
               const SizedBox(height: 24),
@@ -416,7 +426,9 @@ class _BerandaPageState extends State<BerandaPage> {
 
 // ============================ HEADER SAPAAN ================================
 class _GreetingHeader extends StatelessWidget {
-  const _GreetingHeader();
+  const _GreetingHeader({required this.nama});
+
+  final String nama;
 
   @override
   Widget build(BuildContext context) {
@@ -427,17 +439,17 @@ class _GreetingHeader extends StatelessWidget {
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
+              children: [
                 Text(
-                  'Hi, Ananda 👋',
-                  style: TextStyle(
+                  nama.isEmpty ? 'Hi, Ananda 👋' : 'Hai, $nama 👋',
+                  style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textDark,
                   ),
                 ),
-                SizedBox(height: 4),
-                Text(
+                const SizedBox(height: 4),
+                const Text(
                   // PENANDA VERSI v14
                   'Bagaimana Kondisi Anda hari ini?  •  v14',
                   style: TextStyle(fontSize: 13, color: AppColors.textGrey),

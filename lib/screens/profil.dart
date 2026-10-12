@@ -1,7 +1,10 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/profil_pengguna.dart';
 import 'edit_profil.dart';
+import 'auth/masuk.dart';
 import 'pengaturan_notifikasi.dart' hide AppColors;
 import 'tentang.dart' hide AppColors;
 
@@ -23,15 +26,65 @@ abstract class AppColors {
 }
 
 class ProfilPage extends StatefulWidget {
-  const ProfilPage({super.key});
+  final VoidCallback? onKembali;
+
+  const ProfilPage({
+    super.key,
+    this.onKembali,
+  });
 
   @override
   State<ProfilPage> createState() => _ProfilPageState();
 }
 
 class _ProfilPageState extends State<ProfilPage> {
-    String _tema = 'Terang';
-    String _bahasa = 'Bahasa Indonesia';
+  // ====== DATA USER DARI FIREBASE ======
+  String _nama = '...';
+  String _email = '...';
+
+  @override
+  void initState() {
+    super.initState();
+    _muatProfil();
+  }
+
+  /// Ambil nama & email dari Firestore (users/{uid}) + Auth
+  Future<void> _muatProfil() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      String nama = '';
+      String email = user?.email ?? '';
+
+      if (user != null) {
+        final doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+        if (doc.exists) {
+          final data = doc.data()!;
+          nama = (data['profile']?['namaLengkap'] ??
+                  data['akun']?['namaLengkap'] ??
+                  '') as String;
+          if (email.isEmpty) {
+            email = (data['akun']?['email'] ?? '') as String;
+          }
+        }
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _nama = nama.trim().isEmpty ? 'Pengguna MigraCare' : nama.trim();
+        _email = email.isEmpty ? '-' : email;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _nama = 'Pengguna MigraCare';
+        _email = '-';
+      });
+    }
+  }
+
   void _showSnack(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -52,8 +105,10 @@ class _ProfilPageState extends State<ProfilPage> {
       MaterialPageRoute(builder: (_) => const EditProfilPage()),
     );
     setState(() {}); // refresh tampilan setelah kembali dari edit
+    _muatProfil();   // sinkron ulang dengan Firestore
   }
 
+  // ================= LOGOUT ASLI KE FIREBASE =================
   Future<void> _konfirmasiKeluar() async {
     final yakin = await showDialog<bool>(
       context: context,
@@ -90,101 +145,24 @@ class _ProfilPageState extends State<ProfilPage> {
         ],
       ),
     );
-    if (yakin == true) {
-      _showSnack('Berhasil keluar (demo)');
-      // Nanti bisa diarahkan ke halaman Masuk di sini.
+
+    if (yakin != true) return;
+
+    try {
+      await FirebaseAuth.instance.signOut();
+    } catch (_) {
+      // tetap lanjut ke halaman masuk walau signOut error
     }
+    if (!mounted) return;
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const MasukPage()),
+      (route) => false,
+    );
   }
-
-  Future<void> _pilihTema() async {
-  final pilih = await showModalBottomSheet<String>(
-    context: context,
-    backgroundColor: AppColors.surface,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-    ),
-    builder: (context) => SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Pilih Tema',
-              style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textDark),
-            ),
-            const SizedBox(height: 8),
-            ...['Terang', 'Gelap', 'Sistem'].map(
-              (t) => RadioListTile<String>(
-                value: t,
-                groupValue: _tema,
-                activeColor: AppColors.accentDark,
-                title: Text(t,
-                    style: const TextStyle(
-                        fontSize: 13.5, color: AppColors.textDark)),
-                onChanged: (v) => Navigator.pop(context, v),
-              ),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-  if (pilih != null) setState(() => _tema = pilih);
-}
-
-Future<void> _pilihBahasa() async {
-  final pilih = await showModalBottomSheet<String>(
-    context: context,
-    backgroundColor: AppColors.surface,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-    ),
-    builder: (context) => SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Pilih Bahasa',
-              style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textDark),
-            ),
-            const SizedBox(height: 8),
-            RadioListTile<String>(
-              value: 'Bahasa Indonesia',
-              groupValue: _bahasa,
-              activeColor: AppColors.accentDark,
-              title: const Text('Bahasa Indonesia',
-                  style: TextStyle(
-                      fontSize: 13.5, color: AppColors.textDark)),
-              onChanged: (v) => Navigator.pop(context, v),
-            ),
-            const ListTile(
-              enabled: false,
-              title: Text('English (segera hadir)',
-                  style: TextStyle(fontSize: 13.5)),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-  if (pilih != null) setState(() => _bahasa = pilih);
-}
 
   @override
   Widget build(BuildContext context) {
-    final p = ProfilPengguna.instance;
-
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -195,18 +173,36 @@ Future<void> _pilihBahasa() async {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // ================= HEADER =================
-              const Text(
-                'Profil',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textDark,
-                ),
+              Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back_rounded),
+                    color: AppColors.textDark,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    onPressed: () => widget.onKembali?.call(),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'Profil',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textDark,
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 4),
-              const Text(
-                'Kelola akun dan pengaturan privasi anda',
-                style: TextStyle(fontSize: 12.5, color: AppColors.textGrey),
+              const Padding(
+                padding: EdgeInsets.only(left: 44),
+                child: Text(
+                  'Kelola akun dan pengaturan privasi anda',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: AppColors.textGrey,
+                  ),
+                ),
               ),
               const SizedBox(height: 16),
 
@@ -230,14 +226,14 @@ Future<void> _pilihBahasa() async {
                   children: [
                     Row(
                       children: [
-                        AvatarPengguna(radius: 34),
+                        AvatarPengguna(radius: 34, nama: _nama),
                         const SizedBox(width: 14),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                p.nama,
+                                _nama,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
@@ -248,7 +244,7 @@ Future<void> _pilihBahasa() async {
                               ),
                               const SizedBox(height: 3),
                               Text(
-                                p.email,
+                                _email,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
@@ -298,37 +294,19 @@ Future<void> _pilihBahasa() async {
                 ),
               ),
               const SizedBox(height: 10),
-             _MenuSetting(
-               icon: Icons.notifications_rounded,
-               iconBg: const Color(0xFFFDF3D7),
-               iconColor: const Color(0xFFC99A2C),
-               judul: 'Notifikasi',
-               sub: 'Kelola pengingat dan notifikasi penting',
-               onTap: () {
-                    Navigator.of(context).push(                               // benar-benar buka halaman
-                       MaterialPageRoute(
-                            builder: (_) => const PengaturanNotifikasiPage()),
-                    );
+              _MenuSetting(
+                icon: Icons.notifications_rounded,
+                iconBg: const Color(0xFFFDF3D7),
+                iconColor: const Color(0xFFC99A2C),
+                judul: 'Notifikasi',
+                sub: 'Kelola pengingat dan notifikasi penting',
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                        builder: (_) => const PengaturanNotifikasiPage()),
+                  );
                 },
               ),
-              _MenuSetting(
-                icon: Icons.grid_view_rounded,
-                iconBg: const Color(0xFFFDF3D7),
-                iconColor: const Color(0xFFC99A2C),
-                judul: 'Tema',
-                sub: 'Pilih tampilan aplikasi MigraCare',
-                nilai: _tema,
-                onTap: _pilihTema,
-               ),
-             _MenuSetting(
-                icon: Icons.public_rounded,
-                iconBg: const Color(0xFFFDF3D7),
-                iconColor: const Color(0xFFC99A2C),
-                judul: 'Bahasa',
-                sub: 'Pilih bahasa aplikasi',
-                nilai: _bahasa,
-                onTap: _pilihBahasa,
-               ),
               _MenuSetting(
                 icon: Icons.lock_rounded,
                 iconBg: const Color(0xFFFDF3D7),
@@ -337,18 +315,18 @@ Future<void> _pilihBahasa() async {
                 sub: 'Kelola data pribadi dan keamanan akun',
                 onTap: () => _showSnack('Keamanan Akun (segera)'),
               ),
-             _MenuSetting(
+              _MenuSetting(
                 icon: Icons.info_outline_rounded,
                 iconBg: const Color(0xFFFDF3D7),
                 iconColor: const Color(0xFFC99A2C),
                 judul: 'Tentang MigraCare',
                 sub: 'Tentang aplikasi MigraCare',
                 onTap: () {
-                    Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const TentangPage()),
-                    );
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const TentangPage()),
+                  );
                 },
-            ),
+              ),
               const SizedBox(height: 20),
 
               // ================= KELUAR =================
@@ -473,15 +451,19 @@ class _MenuSetting extends StatelessWidget {
 
 // ============================ AVATAR BERSAMA ===============================
 // Publik, dipakai juga oleh halaman Edit Profil.
+// [nama] opsional — kalau diisi, inisial diambil dari situ (nama Firebase);
+// kalau tidak, fallback ke ProfilPengguna.instance (agar Edit Profil tetap jalan).
 class AvatarPengguna extends StatelessWidget {
-  const AvatarPengguna({super.key, this.radius = 34, this.showBadge = true});
+  const AvatarPengguna(
+      {super.key, this.radius = 34, this.showBadge = true, this.nama});
 
   final double radius;
   final bool showBadge;
+  final String? nama;
 
   String get _inisial {
-    final p = ProfilPengguna.instance;
-    final kata = p.nama.trim().split(RegExp(r'\s+'));
+    final sumber = (nama ?? ProfilPengguna.instance.nama).trim();
+    final kata = sumber.split(RegExp(r'\s+'));
     if (kata.isEmpty || kata.first.isEmpty) return '?';
     final a = kata.first[0];
     final b = kata.length > 1 ? kata[1][0] : '';
