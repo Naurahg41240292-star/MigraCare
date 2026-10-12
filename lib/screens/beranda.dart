@@ -450,8 +450,7 @@ class _GreetingHeader extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 const Text(
-                  // PENANDA VERSI v14
-                  'Bagaimana Kondisi Anda hari ini?  •  v14',
+                  'Bagaimana Kondisi Anda hari ini?',
                   style: TextStyle(fontSize: 13, color: AppColors.textGrey),
                 ),
               ],
