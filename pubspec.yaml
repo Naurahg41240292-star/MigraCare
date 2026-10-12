@@ -11,6 +11,14 @@ dependencies:
   flutter:
     sdk: flutter
   image_picker: ^1.1.2
+<<<<<<< HEAD
+=======
+  google_fonts: ^6.2.1
+  url_launcher: ^6.2.0
+
+  # The following adds the Cupertino Icons font to your application.
+  # Use with the CupertinoIcons class for iOS style icons.
+>>>>>>> 44c2369281296c771dc79af5e79ca8142aa5b522
   cupertino_icons: ^1.0.8
   shared_preferences: ^2.5.5
   tflite_flutter: ^0.12.1
@@ -25,10 +33,44 @@ dev_dependencies:
     sdk: flutter
 
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
 
 flutter:
 
   uses-material-design: true
 
   assets:
+<<<<<<< HEAD
     - assets/images/
+=======
+    - assets/images/
+
+  # To add custom fonts to your application, add a fonts section here,
+  # in this "flutter" section. Each entry in this list contains a
+  # "family" key with a "fonts" key with a
+  # list giving the asset and other descriptors for the font. For
+  # example:
+  # fonts:
+  #   - family: Schyler
+  #     fonts:
+  #       - asset: fonts/Schyler-Regular.ttf
+  #       - asset: fonts/Schyler-Italic.ttf
+  #         style: italic
+  #   - family: Trajan Pro
+  #     fonts:
+  #       - asset: fonts/TrajanPro.ttf
+  #       - asset: fonts/TrajanPro_Bold.ttf
+  #         weight: 700
+  #
+  # For details regarding fonts from package dependencies,
+  # see https://flutter.dev/to/font-from-package
+
+# ✅ Konfigurasi ikon launcher — di ROOT level (sejajar dependencies & flutter)
+flutter_launcher_icons:
+  image_path: "assets/images/launcher_logo.png"
+  android: true
+  ios: true
+  adaptive_icon_background: "#FAF4EA"
+  adaptive_icon_foreground: "assets/images/launcher_logo.png"
+  remove_alpha_ios: true
+>>>>>>> 44c2369281296c771dc79af5e79ca8142aa5b522
