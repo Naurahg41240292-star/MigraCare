@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../auth/masuk.dart';
+import 'jadwal_saya.dart';
+import 'chat_booking.dart';
 
 abstract class _Dk {
   static const Color bg = Color(0xFFFAF4EA);
@@ -12,11 +14,7 @@ abstract class _Dk {
 }
 
 /// ==========================================================================
-///  MIGRACARE — Beranda Dokter (sesuai desain Figma)
-///  - Halo, [nama dokter]
-///  - Kartu statistik: Pasien / Pasien Baru Hari Ini
-///  - Akses Cepat: Daftar Pasien, Riwayat Skrining, Artikel (chat menyusul)
-///  - Aktivitas Terbaru
+///  MIGRACARE — Beranda Dokter (sesuai desain Figma) + Booking Masuk
 ///  File: lib/screens/dokter_panel.dart
 /// ==========================================================================
 
@@ -34,6 +32,7 @@ class _DokterPanelPageState extends State<DokterPanelPage> {
   int _totalPasien = 0;
   int _pasienBaruHariIni = 0;
   List<Map<String, dynamic>> _aktivitas = [];
+  List<Map<String, dynamic>> _bookings = [];
 
   @override
   void initState() {
@@ -44,12 +43,14 @@ class _DokterPanelPageState extends State<DokterPanelPage> {
   Future<void> _muat() async {
     setState(() => _loading = true);
     try {
-      // ---------- Data dokter (yang login) ----------
       final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
+      final uid = user?.uid ?? '';
+
+      // ---------- Nama dokter ----------
+      if (uid.isNotEmpty) {
         final meDoc = await FirebaseFirestore.instance
             .collection('users')
-            .doc(user.uid)
+            .doc(uid)
             .get();
         if (meDoc.exists) {
           final me = meDoc.data()!;
@@ -65,8 +66,8 @@ class _DokterPanelPageState extends State<DokterPanelPage> {
           .where('role', isEqualTo: 'pasien')
           .get();
 
-      final awalHari =
-          DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+      final awalHari = DateTime(
+          DateTime.now().year, DateTime.now().month, DateTime.now().day);
 
       int baruHariIni = 0;
       final aktivitas = <Map<String, dynamic>>[];
@@ -77,28 +78,47 @@ class _DokterPanelPageState extends State<DokterPanelPage> {
                 data['akun']?['namaLengkap'] ??
                 'Tanpa nama') as String;
 
-        // pasien baru hari ini
         final dibuat = data['akun']?['dibuatPada'];
         DateTime? dibuatDate;
         if (dibuat is Timestamp) dibuatDate = dibuat.toDate();
         if (dibuatDate != null && dibuatDate.isAfter(awalHari)) {
           baruHariIni++;
         }
-
-        // aktivitas: pasien terbaru mendaftar
         if (dibuatDate != null) {
           aktivitas.add({'nama': nama, 'waktu': dibuatDate});
         }
       }
-
       aktivitas.sort((a, b) =>
           (b['waktu'] as DateTime).compareTo(a['waktu'] as DateTime));
 
+      // ---------- BOOKING MASUK ----------
+      List<Map<String, dynamic>> bookings = [];
+      if (uid.isNotEmpty) {
+        final bSnap = await FirebaseFirestore.instance
+            .collection('booking')
+            .where('dokterUid', isEqualTo: uid)
+            .orderBy('dibuatPada', descending: true)
+            .get();
+        bookings = bSnap.docs.map((d) {
+          final data = d.data();
+          return {
+            'id': d.id,
+            'pasienNama': (data['pasienNama'] ?? 'Pasien') as String,
+            'hari': (data['hari'] ?? '-') as String,
+            'tanggal': (data['tanggal'] ?? '') as String,
+            'jam': (data['jam'] ?? '-') as String,
+            'status': (data['status'] ?? 'menunggu') as String,
+          };
+        }).toList();
+      }
+
+    
       if (!mounted) return;
       setState(() {
         _totalPasien = snap.docs.length;
         _pasienBaruHariIni = baruHariIni;
         _aktivitas = aktivitas.take(3).toList();
+        _bookings = bookings;
         _loading = false;
       });
     } catch (e) {
@@ -106,6 +126,23 @@ class _DokterPanelPageState extends State<DokterPanelPage> {
         setState(() => _loading = false);
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('Gagal memuat data: $e')));
+      }
+    }
+  }
+
+
+  // ================= KONFIRMASI / TOLAK BOOKING =================
+  Future<void> _ubahStatus(String bookingId, String statusBaru) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('booking')
+          .doc(bookingId)
+          .update({'status': statusBaru});
+      _muat();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Gagal mengubah status: $e')));
       }
     }
   }
@@ -145,7 +182,7 @@ class _DokterPanelPageState extends State<DokterPanelPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // ---------- HEADER: LOGO + NOTIF + LOGOUT ----------
+                      // ---------- HEADER ----------
                       Row(
                         children: [
                           Image.asset('assets/images/logo_atas.png',
@@ -224,6 +261,185 @@ class _DokterPanelPageState extends State<DokterPanelPage> {
                       ),
                       const SizedBox(height: 24),
 
+                                            // ---------- BOOKING MASUK ----------
+                      const Text('Booking Masuk',
+                          style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: _Dk.textDark)),
+                      const SizedBox(height: 12),
+
+                      if (_bookings.isEmpty)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: _Dk.outline),
+                          ),
+                          child: const Text(
+                            'Belum ada booking konsultasi.',
+                            style: TextStyle(
+                                fontSize: 12.5, color: _Dk.textGrey),
+                          ),
+                        )
+                      else
+                        for (final b in _bookings)
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: b['status'] == 'menunggu'
+                                    ? const Color(0xFFC9822E)
+                                    : _Dk.outline,
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(b['pasienNama'],
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w700,
+                                              color: _Dk.textDark)),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: b['status'] == 'dikonfirmasi'
+                                            ? const Color(0xFFE4F3E4)
+                                            : (b['status'] == 'ditolak'
+                                                ? const Color(0xFFFCE8E6)
+                                                : const Color(0xFFFDF3D7)),
+                                        borderRadius:
+                                            BorderRadius.circular(20),
+                                      ),
+                                      child: Text(
+                                        b['status'],
+                                        style: TextStyle(
+                                          fontSize: 10.5,
+                                          fontWeight: FontWeight.w700,
+                                          color: b['status'] == 'dikonfirmasi'
+                                              ? const Color(0xFF3E7C3E)
+                                              : (b['status'] == 'ditolak'
+                                                  ? const Color(0xFFE55555)
+                                                  : const Color(0xFFC99A2C)),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  '${b['hari']}, ${b['tanggal']} • ${b['jam']} (30 menit)',
+                                  style: const TextStyle(
+                                      fontSize: 12.5, color: _Dk.textGrey),
+                                ),
+                                if (b['status'] == 'menunggu') ...[
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: OutlinedButton(
+                                          onPressed: () => _ubahStatus(
+                                              b['id'], 'ditolak'),
+                                          style: OutlinedButton.styleFrom(
+                                            foregroundColor:
+                                                const Color(0xFFE55555),
+                                            side: const BorderSide(
+                                                color: Color(0xFFE55555)),
+                                            padding: const EdgeInsets
+                                                .symmetric(vertical: 8),
+                                            shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(
+                                                        10)),
+                                          ),
+                                          child: const Text('Tolak',
+                                              style: TextStyle(
+                                                  fontSize: 12.5,
+                                                  fontWeight:
+                                                      FontWeight.w700)),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: ElevatedButton(
+                                          onPressed: () => _ubahStatus(
+                                              b['id'], 'dikonfirmasi'),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor:
+                                                const Color(0xFFC9822E),
+                                            foregroundColor: Colors.white,
+                                            elevation: 0,
+                                            padding: const EdgeInsets
+                                                .symmetric(vertical: 8),
+                                            shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(
+                                                        10)),
+                                          ),
+                                          child: const Text('Konfirmasi',
+                                              style: TextStyle(
+                                                  fontSize: 12.5,
+                                                  fontWeight:
+                                                      FontWeight.w700)),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                                // ✅ TAMBAH: tombol Buka Chat (booking yang dikonfirmasi)
+                                if (b['status'] == 'dikonfirmasi') ...[
+                                  const SizedBox(height: 12),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    height: 42,
+                                    child: ElevatedButton.icon(
+                                      onPressed: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => ChatBookingPage(
+                                              bookingId: b['id'],
+                                              booking: b,
+                                              sayaDokter: true,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFF6B4A2B),
+                                        foregroundColor: Colors.white,
+                                        elevation: 0,
+                                        shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(10)),
+                                      ),
+                                      icon: const Icon(Icons.chat_rounded,
+                                          size: 16),
+                                      label: const Text('Buka Chat',
+                                          style: TextStyle(
+                                              fontSize: 12.5,
+                                              fontWeight: FontWeight.w700)),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                      const SizedBox(height: 24),
+                    
                       // ---------- AKSES CEPAT ----------
                       const Text('Akses Cepat',
                           style: TextStyle(
@@ -233,8 +449,14 @@ class _DokterPanelPageState extends State<DokterPanelPage> {
                       const SizedBox(height: 14),
                       Row(
                         children: [
-                          _aksesCepat(Icons.forum_rounded, 'Chat Pasien',
-                              () => _showSnack('Chat Pasien (menyusul — fitur chat)')),
+                          _aksesCepat(Icons.event_available_rounded,
+                              'Jadwal Saya', () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const JadwalSayaPage()),
+                            );
+                          }),
                           const SizedBox(width: 12),
                           _aksesCepat(Icons.groups_rounded, 'Daftar Pasien',
                               () => _showSnack('Daftar Pasien (menyusul)')),

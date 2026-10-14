@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 
 /// =======================================================================
 ///  MIGRACARE — Model & Data Dokter & Riwayat Konsultasi
@@ -31,6 +33,35 @@ class Dokter {
     required this.warnaAvatar,
     this.foto,
   });
+
+  /// ✅ BARU: ubah dokumen users/{uid} (role=dokter) dari Firestore
+  /// menjadi object Dokter yang siap dipakai UI
+  factory Dokter.fromFirestore(String uid, Map<String, dynamic> data) {
+    final profile = (data['profile'] as Map<String, dynamic>?) ?? {};
+    final akun = (data['akun'] as Map<String, dynamic>?) ?? {};
+    final nama = (profile['namaLengkap'] ??
+            akun['namaLengkap'] ??
+            'dr. Tanpa Nama') as String;
+
+    // bio → spesialis; kalau bio "dokter umum" → bukan spesialis
+    final bio = (profile['bio'] ?? 'Dokter Umum') as String;
+    final isSpesialis =
+        bio.toLowerCase().contains('spesialis') ||
+        bio.toLowerCase().contains('sp.');
+
+    return Dokter(
+      id: uid,
+      nama: nama,
+      spesialis: bio,
+      isSpesialis: isSpesialis,
+      rating: 5.0,                    // rating real bisa diisi nanti (fitur ulasan)
+      jumlahUlasan: 0,
+      pengalaman: '-',                // belum ada datanya di Firestore
+      jamPraktik: '-',                // akan diisi dari koleksi jadwal
+      lokasi: '-',
+      warnaAvatar: const Color(0xFFF6DFC8),
+    );
+  }
 }
 
 class RiwayatKonsultasi {
@@ -48,7 +79,7 @@ class RiwayatKonsultasi {
 }
 
 /// -------------------------------------------------------------------------
-/// DATA DUMMY DOKTER
+/// DATA DUMMY (fallback — dipakai kalau Firestore kosong/error)
 /// -------------------------------------------------------------------------
 const List<Dokter> daftarDokter = [
   Dokter(
@@ -118,9 +149,6 @@ const List<Dokter> daftarDokter = [
   ),
 ];
 
-/// -------------------------------------------------------------------------
-/// DATA DUMMY RIWAYAT KONSULTASI
-/// -------------------------------------------------------------------------
 const List<RiwayatKonsultasi> daftarRiwayat = [
   RiwayatKonsultasi(
     dokterId: 'd1',

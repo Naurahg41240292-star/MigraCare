@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../services/profil_service.dart';
 
 import '../models/dokter.dart';
 import '../theme.dart';
@@ -6,6 +9,7 @@ import '../utils/rute.dart';
 import '../widgets/widget_konsultasi.dart';
 import 'chat_konsultasi.dart';
 import 'detail_dokter.dart';
+import 'dokter/chat_booking.dart';
 
 class KonsultasiScreen extends StatefulWidget {
   final VoidCallback? onKembali;
@@ -25,11 +29,100 @@ class _KonsultasiScreenState extends State<KonsultasiScreen> {
   String _query = '';
   String _chip = 'Semua';
 
+  // ✅ Nama user untuk sapaan
+  String _nama = '';
+
+  // ✅ Dokter REAL dari Firestore
+  bool _loadingDokter = true;
+  List<Dokter> _dokterFirestore = [];
+
+  // ✅ BARU: booking milik pasien (dari koleksi booking/)
+  List<Map<String, dynamic>> _bookings = [];
+  bool _loadingBooking = false;
+
   bool get _tampilkanRiwayat => _chip == 'Riwayat';
 
+  @override
+  void initState() {
+    super.initState();
+    _muatNama();
+    _muatDokterFirestore();
+    _muatBooking();
+  }
+
+  // ✅ Ambil nama user untuk sapaan
+  Future<void> _muatNama() async {
+    final nama = await ProfilService.instance.ambilNama();
+    if (!mounted) return;
+    setState(() => _nama = nama);
+  }
+
+  // ✅ Ambil dokter REAL dari Firestore (users role=dokter)
+  Future<void> _muatDokterFirestore() async {
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('users')
+          .where('role', isEqualTo: 'dokter')
+          .get();
+
+      if (!mounted) return;
+      setState(() {
+        _dokterFirestore = snap.docs
+            .map((d) => Dokter.fromFirestore(d.id, d.data()))
+            .toList();
+        _loadingDokter = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loadingDokter = false);
+    }
+  }
+  // ✅ Ambil booking milik pasien yang login
+  Future<void> _muatBooking() async {
+    setState(() => _loadingBooking = true);
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        if (mounted) setState(() => _loadingBooking = false);   // ← loading dimatikan
+        return;
+      }
+
+      final snap = await FirebaseFirestore.instance
+          .collection('booking')
+          .where('pasienUid', isEqualTo: user.uid)
+          .orderBy('dibuatPada', descending: true)
+          .get();
+
+      if (!mounted) return;
+      setState(() {
+        _bookings = snap.docs.map((d) {
+          final data = d.data();
+          return {
+            'id': d.id,
+            'dokterNama': (data['dokterNama'] ?? 'Dokter') as String,
+            'hari': (data['hari'] ?? '-') as String,
+            'tanggal': (data['tanggal'] ?? '') as String,
+            'jam': (data['jam'] ?? '-') as String,
+            'status': (data['status'] ?? 'menunggu') as String,
+            'booking': data,
+          };
+        }).toList();
+        _loadingBooking = false;                                 // ← loading dimatikan ✅
+      });
+    } catch (e) {
+      debugPrint('Gagal muat booking: $e');                      // ← error TAMPIL di console
+      if (mounted) {
+        setState(() => _loadingBooking = false);                 // ← loading dimatikan ✅
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Gagal memuat booking: $e'))); // ← error TAMPIL di layar
+      }
+    }
+  }
+  
   List<Dokter> get _dokterTerfilter {
     final q = _query.trim().toLowerCase();
-    return daftarDokter.where((d) {
+    final sumber = _dokterFirestore.isNotEmpty ? _dokterFirestore : daftarDokter;
+    return sumber.where((d) {
       final bool sesuaiKategori;
       switch (_chip) {
         case 'Dokter Umum':
@@ -65,88 +158,97 @@ class _KonsultasiScreenState extends State<KonsultasiScreen> {
     );
   }
 
-  @override
-Widget build(BuildContext context) {
-  return Scaffold(
-    backgroundColor: AppColors.bg,
-    body: SafeArea(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // TOMBOL BACK → KEMBALI KE BERANDA
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 6, 20, 0),
-            child: Row(
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.arrow_back_rounded),
-                  color: AppColors.textDark,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  onPressed: () => widget.onKembali?.call(),
-                ),
-                const SizedBox(width: 12),
-                const Text(
-                  'Konsultasi',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textDark,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // SAPAAN
-          const Padding(
-            padding: EdgeInsets.fromLTRB(20, 10, 20, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Hai, Ananda! 👋',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.primary,
-                  ),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  'Sehat hari ini, langkah baik untuk esok.',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: AppColors.textSoft,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // SEARCH
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-            child: _kolomCari(),
-          ),
-
-          // FILTER CHIP
-          SizedBox(
-            height: 52,
-            child: _chipBar(),
-          ),
-
-          // DAFTAR DOKTER / RIWAYAT
-          Expanded(
-            child: _tampilkanRiwayat
-                ? _listRiwayat()
-                : _listDokter(),
-          ),
-        ],
+  // ✅ BARU: buka chat BOOKING (pasien ↔ dokter asli)
+  void _bukaChatBooking(Map<String, dynamic> b) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ChatBookingPage(
+          bookingId: b['id'],
+          booking: b['booking'] as Map<String, dynamic>,
+          sayaDokter: false, // ← dari sisi PASIEN
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.bg,
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // TOMBOL BACK → KEMBALI KE BERANDA
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 6, 20, 0),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back_rounded),
+                    color: AppColors.textDark,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    onPressed: () => widget.onKembali?.call(),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'Konsultasi',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textDark,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // SAPAAN
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Hai, $_nama 👋',
+                      style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.primary)),
+                  const SizedBox(height: 4),
+                  const Text('Sehat hari ini, langkah baik untuk esok.',
+                      style: TextStyle(fontSize: 13, color: AppColors.textSoft)),
+                ],
+              ),
+            ),
+
+            // SEARCH
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+              child: _kolomCari(),
+            ),
+
+            // FILTER CHIP — ✅ saat pilih "Riwayat" → refresh booking
+            SizedBox(
+              height: 52,
+              child: _chipBar(),
+            ),
+
+            // DAFTAR DOKTER / RIWAYAT
+            Expanded(
+              child: _tampilkanRiwayat
+                  ? _listRiwayat()
+                  : (_loadingDokter
+                      ? const Center(child: CircularProgressIndicator())
+                      : _listDokter()),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _kolomCari() {
     return TextField(
       onChanged: (v) => setState(() => _query = v),
@@ -182,7 +284,11 @@ Widget build(BuildContext context) {
         final terpilih = c == _chip;
         return InkWell(
           borderRadius: BorderRadius.circular(20),
-          onTap: () => setState(() => _chip = c),
+          onTap: () {
+            setState(() => _chip = c);
+            // ✅ BARU: saat pilih "Riwayat" → muat ulang booking
+            if (c == 'Riwayat') _muatBooking();
+          },
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
@@ -213,18 +319,96 @@ Widget build(BuildContext context) {
     );
   }
 
+  // ✅ DIGANTI: Riwayat = daftar BOOKING real dari Firestore + tombol Chat
   Widget _listRiwayat() {
-    if (daftarRiwayat.isEmpty) return _kosong('Belum ada riwayat konsultasi.');
-    return ListView.separated(
+    if (_loadingBooking) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_bookings.isEmpty) {
+      return _kosong('Belum ada booking konsultasi.\n'
+          'Booking lewat detail dokter ya!');
+    }
+    return ListView.builder(
       padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
-      itemCount: daftarRiwayat.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 12),
+      itemCount: _bookings.length,
       itemBuilder: (_, i) {
-        final r = daftarRiwayat[i];
-        final d = daftarDokter.firstWhere((d) => d.id == r.dokterId);
-        return _KartuRiwayat(
-          dokter: d, topik: r.topik, tanggal: r.tanggal, status: r.status,
-          onTap: () => _bukaChat(d),
+        final b = _bookings[i];
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppColors.card,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: AppShadows.card,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ---- baris nama + badge status ----
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(b['dokterNama'],
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textDark)),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: b['status'] == 'dikonfirmasi'
+                          ? const Color(0xFFE4F3E4)
+                          : (b['status'] == 'ditolak'
+                              ? const Color(0xFFFCE8E6)
+                              : const Color(0xFFFDF3D7)),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(b['status'],
+                        style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            color: b['status'] == 'dikonfirmasi'
+                                ? const Color(0xFF3E7C3E)
+                                : (b['status'] == 'ditolak'
+                                    ? const Color(0xFFE55555)
+                                    : const Color(0xFFC99A2C)))),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text('${b['hari']}, ${b['tanggal']} • ${b['jam']} (30 menit)',
+                  style: const TextStyle(
+                      fontSize: 12.5, color: AppColors.textSoft)),
+
+              // ---- ✅ TOMBOL CHAT — hanya untuk booking DIKONFIRMASI ----
+              if (b['status'] == 'dikonfirmasi') ...[
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  height: 42,
+                  child: ElevatedButton.icon(
+                    onPressed: () => _bukaChatBooking(b),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                    ),
+                    icon: const Icon(Icons.chat_rounded, size: 16),
+                    label: const Text('Chat Sekarang',
+                        style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700)),
+                  ),
+                ),
+              ],
+            ],
+          ),
         );
       },
     );
