@@ -7,12 +7,11 @@ import 'edit_profil.dart';
 import 'auth/masuk.dart';
 import 'pengaturan_notifikasi.dart' hide AppColors;
 import 'tentang.dart' hide AppColors;
+import 'keamanan_akun.dart' hide AppColors;
 
-/// ==========================================================================
-///  MIGRACARE — Halaman Profil
-///  File: lib/screens/profil.dart
-///  (Tanpa bottom nav — nav milik halaman_utama)
-/// ==========================================================================
+/// MIGRACARE — Halaman Profil
+/// File: lib/screens/profil.dart
+/// Tanpa bottom nav — navigasi bawah dikelola oleh halaman_utama.
 
 abstract class AppColors {
   static const Color background = Color(0xFFFAF4EA);
@@ -28,17 +27,13 @@ abstract class AppColors {
 class ProfilPage extends StatefulWidget {
   final VoidCallback? onKembali;
 
-  const ProfilPage({
-    super.key,
-    this.onKembali,
-  });
+  const ProfilPage({super.key, this.onKembali});
 
   @override
   State<ProfilPage> createState() => _ProfilPageState();
 }
 
 class _ProfilPageState extends State<ProfilPage> {
-  // ====== DATA USER DARI FIREBASE ======
   String _nama = '...';
   String _email = '...';
 
@@ -48,18 +43,14 @@ class _ProfilPageState extends State<ProfilPage> {
     _muatProfil();
   }
 
-  /// Ambil nama & email dari Firestore (users/{uid}) + Auth
   Future<void> _muatProfil() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
-      String nama = '';
-      String email = user?.email ?? '';
+      var nama = '';
+      var email = user?.email ?? '';
 
       if (user != null) {
-        final doc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .get();
+        final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
         if (doc.exists) {
           final data = doc.data()!;
           nama = (data['profile']?['namaLengkap'] ??
@@ -85,45 +76,23 @@ class _ProfilPageState extends State<ProfilPage> {
     }
   }
 
-  void _showSnack(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: AppColors.darkBrown,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
-  }
-
   Future<void> _bukaEditProfil() async {
     await Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const EditProfilPage()),
     );
-    setState(() {}); // refresh tampilan setelah kembali dari edit
-    _muatProfil();   // sinkron ulang dengan Firestore
+    if (!mounted) return;
+    _muatProfil();
   }
 
-  // ================= LOGOUT ASLI KE FIREBASE =================
   Future<void> _konfirmasiKeluar() async {
     final yakin = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         backgroundColor: AppColors.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text(
           'Keluar dari Akun?',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textDark,
-          ),
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textDark),
         ),
         content: const Text(
           'Kamu harus masuk lagi untuk mengakses akunmu.',
@@ -131,16 +100,15 @@ class _ProfilPageState extends State<ProfilPage> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Batal',
-                style: TextStyle(color: AppColors.textGrey)),
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Batal', style: TextStyle(color: AppColors.textGrey)),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Keluar',
-                style: TextStyle(
-                    color: Color(0xFFE55555),
-                    fontWeight: FontWeight.w700)),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text(
+              'Keluar',
+              style: TextStyle(color: Color(0xFFE55555), fontWeight: FontWeight.w700),
+            ),
           ),
         ],
       ),
@@ -151,10 +119,11 @@ class _ProfilPageState extends State<ProfilPage> {
     try {
       await FirebaseAuth.instance.signOut();
     } catch (_) {
-      // tetap lanjut ke halaman masuk walau signOut error
+      // Tetap lanjut ke halaman masuk jika signOut mengalami kegagalan.
     }
+
     if (!mounted) return;
-    Navigator.pushAndRemoveUntil(
+    await Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (_) => const MasukPage()),
       (route) => false,
@@ -172,7 +141,6 @@ class _ProfilPageState extends State<ProfilPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ================= HEADER =================
               Row(
                 children: [
                   IconButton(
@@ -185,11 +153,7 @@ class _ProfilPageState extends State<ProfilPage> {
                   const SizedBox(width: 12),
                   const Text(
                     'Profil',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textDark,
-                    ),
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.textDark),
                   ),
                 ],
               ),
@@ -198,15 +162,10 @@ class _ProfilPageState extends State<ProfilPage> {
                 padding: EdgeInsets.only(left: 44),
                 child: Text(
                   'Kelola akun dan pengaturan privasi anda',
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    color: AppColors.textGrey,
-                  ),
+                  style: TextStyle(fontSize: 12.5, color: AppColors.textGrey),
                 ),
               ),
               const SizedBox(height: 16),
-
-              // ================= KARTU PROFIL =================
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
@@ -215,11 +174,7 @@ class _ProfilPageState extends State<ProfilPage> {
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: AppColors.outline),
                   boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x14A52A2A),
-                      blurRadius: 10,
-                      offset: Offset(0, 4),
-                    ),
+                    BoxShadow(color: Color(0x14A52A2A), blurRadius: 10, offset: Offset(0, 4)),
                   ],
                 ),
                 child: Column(
@@ -236,21 +191,14 @@ class _ProfilPageState extends State<ProfilPage> {
                                 _nama,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 15.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.textDark,
-                                ),
+                                style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700, color: AppColors.textDark),
                               ),
                               const SizedBox(height: 3),
                               Text(
                                 _email,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: AppColors.textGrey,
-                                ),
+                                style: const TextStyle(fontSize: 12, color: AppColors.textGrey),
                               ),
                             ],
                           ),
@@ -266,32 +214,19 @@ class _ProfilPageState extends State<ProfilPage> {
                           backgroundColor: AppColors.accentDark,
                           foregroundColor: Colors.white,
                           elevation: 0,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 8),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         ),
-                        child: const Text(
-                          'Edit Profil',
-                          style: TextStyle(
-                              fontSize: 12, fontWeight: FontWeight.w700),
-                        ),
+                        child: const Text('Edit Profil', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
                       ),
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 20),
-
-              // ================= PENGATURAN APLIKASI =================
               const Text(
                 'Pengaturan Aplikasi',
-                style: TextStyle(
-                  fontSize: 14.5,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textDark,
-                ),
+                style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: AppColors.textDark),
               ),
               const SizedBox(height: 10),
               _MenuSetting(
@@ -300,12 +235,9 @@ class _ProfilPageState extends State<ProfilPage> {
                 iconColor: const Color(0xFFC99A2C),
                 judul: 'Notifikasi',
                 sub: 'Kelola pengingat dan notifikasi penting',
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                        builder: (_) => const PengaturanNotifikasiPage()),
-                  );
-                },
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const PengaturanNotifikasiPage()),
+                ),
               ),
               _MenuSetting(
                 icon: Icons.lock_rounded,
@@ -313,7 +245,9 @@ class _ProfilPageState extends State<ProfilPage> {
                 iconColor: const Color(0xFFC99A2C),
                 judul: 'Keamanan Akun',
                 sub: 'Kelola data pribadi dan keamanan akun',
-                onTap: () => _showSnack('Keamanan Akun (segera)'),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const KeamananAkunPage()),
+                ),
               ),
               _MenuSetting(
                 icon: Icons.info_outline_rounded,
@@ -321,15 +255,11 @@ class _ProfilPageState extends State<ProfilPage> {
                 iconColor: const Color(0xFFC99A2C),
                 judul: 'Tentang MigraCare',
                 sub: 'Tentang aplikasi MigraCare',
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const TentangPage()),
-                  );
-                },
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const TentangPage()),
+                ),
               ),
               const SizedBox(height: 20),
-
-              // ================= KELUAR =================
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
@@ -338,16 +268,10 @@ class _ProfilPageState extends State<ProfilPage> {
                     foregroundColor: const Color(0xFFE55555),
                     side: const BorderSide(color: Color(0xFFE55555)),
                     padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   icon: const Icon(Icons.logout_rounded, size: 18),
-                  label: const Text(
-                    'Keluar dari Akun',
-                    style: TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.w700),
-                  ),
+                  label: const Text('Keluar dari Akun', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
                 ),
               ),
               const SizedBox(height: 24),
@@ -359,7 +283,6 @@ class _ProfilPageState extends State<ProfilPage> {
   }
 }
 
-// ============================ MENU PENGATURAN ==============================
 class _MenuSetting extends StatelessWidget {
   const _MenuSetting({
     required this.icon,
@@ -368,7 +291,6 @@ class _MenuSetting extends StatelessWidget {
     required this.judul,
     required this.sub,
     required this.onTap,
-    this.nilai,
   });
 
   final IconData icon;
@@ -376,7 +298,6 @@ class _MenuSetting extends StatelessWidget {
   final Color iconColor;
   final String judul;
   final String sub;
-  final String? nilai;
   final VoidCallback onTap;
 
   @override
@@ -400,10 +321,7 @@ class _MenuSetting extends StatelessWidget {
                 Container(
                   width: 40,
                   height: 40,
-                  decoration: BoxDecoration(
-                    color: iconBg,
-                    borderRadius: BorderRadius.circular(11),
-                  ),
+                  decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(11)),
                   child: Icon(icon, color: iconColor, size: 20),
                 ),
                 const SizedBox(width: 12),
@@ -411,35 +329,14 @@ class _MenuSetting extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        judul,
-                        style: const TextStyle(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textDark,
-                        ),
-                      ),
+                      Text(judul, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textDark)),
                       const SizedBox(height: 2),
-                      Text(
-                        sub,
-                        style: const TextStyle(
-                            fontSize: 11, color: AppColors.textGrey),
-                      ),
+                      Text(sub, style: const TextStyle(fontSize: 11, color: AppColors.textGrey)),
                     ],
                   ),
                 ),
-                if (nilai != null)
-                  Text(
-                    nilai!,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.accentDark,
-                    ),
-                  ),
                 const SizedBox(width: 4),
-                const Icon(Icons.chevron_right_rounded,
-                    color: AppColors.textGrey),
+                const Icon(Icons.chevron_right_rounded, color: AppColors.textGrey),
               ],
             ),
           ),
@@ -449,13 +346,14 @@ class _MenuSetting extends StatelessWidget {
   }
 }
 
-// ============================ AVATAR BERSAMA ===============================
-// Publik, dipakai juga oleh halaman Edit Profil.
-// [nama] opsional — kalau diisi, inisial diambil dari situ (nama Firebase);
-// kalau tidak, fallback ke ProfilPengguna.instance (agar Edit Profil tetap jalan).
+/// Avatar bersama, dipakai juga oleh halaman Edit Profil.
 class AvatarPengguna extends StatelessWidget {
-  const AvatarPengguna(
-      {super.key, this.radius = 34, this.showBadge = true, this.nama});
+  const AvatarPengguna({
+    super.key,
+    this.radius = 34,
+    this.showBadge = true,
+    this.nama,
+  });
 
   final double radius;
   final bool showBadge;
@@ -472,7 +370,7 @@ class AvatarPengguna extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final p = ProfilPengguna.instance;
+    final profil = ProfilPengguna.instance;
     final badgeD = radius * 0.78;
 
     return Stack(
@@ -481,35 +379,24 @@ class AvatarPengguna extends StatelessWidget {
         Container(
           width: radius * 2,
           height: radius * 2,
-          decoration: const BoxDecoration(
-            shape: BoxShape.circle,
-            color: Color(0xFFF5C04E),
-          ),
-          child: p.fotoPath == null
+          decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFFF5C04E)),
+          child: profil.fotoPath == null
               ? Center(
                   child: Text(
                     _inisial,
-                    style: TextStyle(
-                      fontSize: radius * 0.72,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.darkBrown,
-                    ),
+                    style: TextStyle(fontSize: radius * 0.72, fontWeight: FontWeight.w800, color: AppColors.darkBrown),
                   ),
                 )
               : ClipOval(
                   child: Image.file(
-                    File(p.fotoPath!),
+                    File(profil.fotoPath!),
                     fit: BoxFit.cover,
                     width: radius * 2,
                     height: radius * 2,
-                    errorBuilder: (_, __, ___) => Center(
+                    errorBuilder: (context, error, stackTrace) => Center(
                       child: Text(
                         _inisial,
-                        style: TextStyle(
-                          fontSize: radius * 0.72,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.darkBrown,
-                        ),
+                        style: TextStyle(fontSize: radius * 0.72, fontWeight: FontWeight.w800, color: AppColors.darkBrown),
                       ),
                     ),
                   ),
@@ -527,11 +414,7 @@ class AvatarPengguna extends StatelessWidget {
                 color: AppColors.darkBrown,
                 border: Border.all(color: AppColors.surface, width: 2),
               ),
-              child: Icon(
-                Icons.photo_camera_rounded,
-                color: Colors.white,
-                size: badgeD * 0.5,
-              ),
+              child: Icon(Icons.photo_camera_rounded, color: Colors.white, size: badgeD * 0.5),
             ),
           ),
       ],
