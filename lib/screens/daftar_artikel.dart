@@ -1,13 +1,13 @@
+
 import 'package:flutter/material.dart';
 import '../models/artikel.dart';
 import 'detail_artikel.dart';
 
 // =======================================================================
-//  MIGRACARE — Halaman Daftar Artikel (dibuka dari "Lihat Semua")
-//  File: lib/screens/daftar_artikel.dart
+// MIGRACARE — Halaman Daftar Artikel
+// File: lib/screens/daftar_artikel.dart
 // =======================================================================
 
-/// Palet warna lokal (konsisten dengan beranda.dart & detail_artikel.dart)
 abstract class _C {
   static const Color background = Color(0xFFFAF4EA);
   static const Color surface = Colors.white;
@@ -30,29 +30,37 @@ class _DaftarArtikelPageState extends State<DaftarArtikelPage> {
   String _query = '';
   String _activeCategory = 'Semua';
 
-  /// Kategori diambil otomatis dari data artikel
   late final List<String> _categories = [
     'Semua',
-    ...artikelPopuler.map((a) => a.category).toSet(),
+    ...artikelPopuler.map((artikel) => artikel.category).toSet(),
   ];
 
   List<Artikel> get _hasilFilter {
-    final q = _query.trim().toLowerCase();
-    return artikelPopuler.where((a) {
-      final cocokKategori =
-          _activeCategory == 'Semua' || a.category == _activeCategory;
-      final cocokPencarian = q.isEmpty ||
-          a.title.toLowerCase().contains(q) ||
-          a.subtitle.toLowerCase().contains(q) ||
-          a.category.toLowerCase().contains(q);
+    final query = _query.trim().toLowerCase();
+
+    return artikelPopuler.where((artikel) {
+      final cocokKategori = _activeCategory == 'Semua' ||
+          artikel.category == _activeCategory;
+
+      final cocokPencarian = query.isEmpty ||
+          artikel.title.toLowerCase().contains(query) ||
+          artikel.subtitle.toLowerCase().contains(query) ||
+          artikel.category.toLowerCase().contains(query);
+
       return cocokKategori && cocokPencarian;
     }).toList();
   }
 
   void _bukaDetail(Artikel artikel) {
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => DetailArtikelPage(artikel: artikel)),
+      MaterialPageRoute<void>(
+        builder: (_) => DetailArtikelPage(artikel: artikel),
+      ),
     );
+  }
+
+  void _kembali() {
+    Navigator.of(context).pop();
   }
 
   @override
@@ -73,7 +81,10 @@ class _DaftarArtikelPageState extends State<DaftarArtikelPage> {
               padding: const EdgeInsets.fromLTRB(20, 6, 20, 0),
               child: Text(
                 '${hasil.length} artikel',
-                style: const TextStyle(fontSize: 11, color: _C.textGrey),
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: _C.textGrey,
+                ),
               ),
             ),
             Expanded(
@@ -82,11 +93,16 @@ class _DaftarArtikelPageState extends State<DaftarArtikelPage> {
                   : ListView.separated(
                       padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
                       itemCount: hasil.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 12),
-                      itemBuilder: (context, index) => _ArtikelListCard(
-                        artikel: hasil[index],
-                        onTap: () => _bukaDetail(hasil[index]),
-                      ),
+                      separatorBuilder: (_, index) =>
+                          const SizedBox(height: 12),
+                      itemBuilder: (context, index) {
+                        final artikel = hasil[index];
+
+                        return _ArtikelListCard(
+                          artikel: artikel,
+                          onTap: () => _bukaDetail(artikel),
+                        );
+                      },
                     ),
             ),
           ],
@@ -95,16 +111,21 @@ class _DaftarArtikelPageState extends State<DaftarArtikelPage> {
     );
   }
 
-  // ------------------------------- HEADER ---------------------------------
+  // ================================ HEADER ================================
+
   Widget _buildHeader() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(8, 8, 20, 0),
       child: Row(
         children: [
           IconButton(
-            onPressed: () => Navigator.of(context).pop(),
-            icon: const Icon(Icons.arrow_back_rounded,
-                color: _C.darkBrown, size: 26),
+            tooltip: 'Kembali',
+            onPressed: _kembali,
+            icon: const Icon(
+              Icons.arrow_back_rounded,
+              color: _C.darkBrown,
+              size: 26,
+            ),
           ),
           const SizedBox(width: 2),
           const Expanded(
@@ -122,7 +143,10 @@ class _DaftarArtikelPageState extends State<DaftarArtikelPage> {
                 SizedBox(height: 2),
                 Text(
                   'Baca informasi seputar migrain dan cara mengatasinya',
-                  style: TextStyle(fontSize: 12, color: _C.textGrey),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: _C.textGrey,
+                  ),
                 ),
               ],
             ),
@@ -132,25 +156,43 @@ class _DaftarArtikelPageState extends State<DaftarArtikelPage> {
     );
   }
 
-  // ------------------------------ PENCARIAN -------------------------------
+  // ============================= PENCARIAN ================================
+
   Widget _buildSearchField() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 4),
       child: TextField(
-        onChanged: (value) => setState(() => _query = value),
-        style: const TextStyle(fontSize: 13.5, color: _C.textDark),
+        onChanged: (value) {
+          setState(() => _query = value);
+        },
+        style: const TextStyle(
+          fontSize: 13.5,
+          color: _C.textDark,
+        ),
         decoration: InputDecoration(
-          hintText: 'Cari artikel…',
-          hintStyle: const TextStyle(fontSize: 13.5, color: _C.textGrey),
-          prefixIcon:
-              const Icon(Icons.search_rounded, color: _C.textGrey, size: 22),
+          hintText: 'Cari artikel...',
+          hintStyle: const TextStyle(
+            fontSize: 13.5,
+            color: _C.textGrey,
+          ),
+          prefixIcon: const Icon(
+            Icons.search_rounded,
+            color: _C.textGrey,
+            size: 22,
+          ),
           suffixIcon: _query.isEmpty
               ? null
               : IconButton(
+                  tooltip: 'Hapus pencarian',
                   padding: EdgeInsets.zero,
-                  icon: const Icon(Icons.close_rounded,
-                      size: 18, color: _C.textGrey),
-                  onPressed: () => setState(() => _query = ''),
+                  icon: const Icon(
+                    Icons.close_rounded,
+                    size: 18,
+                    color: _C.textGrey,
+                  ),
+                  onPressed: () {
+                    setState(() => _query = '');
+                  },
                 ),
           filled: true,
           fillColor: _C.surface,
@@ -161,34 +203,46 @@ class _DaftarArtikelPageState extends State<DaftarArtikelPage> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: _C.accentDark, width: 1.2),
+            borderSide: const BorderSide(
+              color: _C.accentDark,
+              width: 1.2,
+            ),
           ),
         ),
       ),
     );
   }
 
-  // --------------------------- FILTER KATEGORI ----------------------------
+  // =========================== FILTER KATEGORI ============================
+
   Widget _buildCategoryChips() {
     return SizedBox(
       height: 44,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+        padding: const EdgeInsets.symmetric(
+          horizontal: 20,
+          vertical: 6,
+        ),
         itemCount: _categories.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        separatorBuilder: (_, index) => const SizedBox(width: 8),
         itemBuilder: (context, index) {
           final kategori = _categories[index];
           final aktif = kategori == _activeCategory;
+
           return GestureDetector(
-            onTap: () => setState(() => _activeCategory = kategori),
+            onTap: () {
+              setState(() => _activeCategory = kategori);
+            },
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14),
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: aktif ? _C.accent : _C.surface,
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: aktif ? _C.accent : _C.outline),
+                border: Border.all(
+                  color: aktif ? _C.accent : _C.outline,
+                ),
               ),
               child: Text(
                 kategori,
@@ -205,36 +259,55 @@ class _DaftarArtikelPageState extends State<DaftarArtikelPage> {
     );
   }
 
-  // ------------------------------ EMPTY STATE -----------------------------
+  // ============================== EMPTY STATE ==============================
+
   Widget _buildEmptyState() {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.search_off_rounded,
-              size: 56, color: Color(0x669C948A)),
-          const SizedBox(height: 12),
-          const Text(
-            'Artikel tidak ditemukan',
-            style: TextStyle(
-                fontSize: 15, fontWeight: FontWeight.w700, color: _C.textDark),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            'Coba kata kunci atau kategori lain.',
-            style: TextStyle(fontSize: 12.5, color: _C.textGrey),
-          ),
-        ],
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.search_off_rounded,
+              size: 56,
+              color: Color(0x669C948A),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Artikel tidak ditemukan',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: _C.textDark,
+              ),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Coba kata kunci atau kategori lain.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12.5,
+                color: _C.textGrey,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-// ===========================================================================
-//  KARTU ARTIKEL (list vertikal — sesuai mockup)
-// ===========================================================================
+// =======================================================================
+// KARTU ARTIKEL
+// =======================================================================
+
 class _ArtikelListCard extends StatelessWidget {
-  const _ArtikelListCard({required this.artikel, required this.onTap});
+  const _ArtikelListCard({
+    required this.artikel,
+    required this.onTap,
+  });
 
   final Artikel artikel;
   final VoidCallback onTap;
@@ -273,12 +346,16 @@ class _ArtikelListCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 12),
+
+                // Informasi artikel
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         artikel.category,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w800,
@@ -310,25 +387,45 @@ class _ArtikelListCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 6),
+
+                      // Tanggal dan durasi baca
                       Row(
                         children: [
-                          const Icon(Icons.calendar_today_rounded,
-                              size: 11, color: _C.textGrey),
+                          const Icon(
+                            Icons.calendar_today_rounded,
+                            size: 11,
+                            color: _C.textGrey,
+                          ),
                           const SizedBox(width: 4),
-                          Text(
-                            artikel.date,
-                            style: const TextStyle(
-                                fontSize: 10.5, color: _C.textGrey),
+                          Flexible(
+                            child: Text(
+                              artikel.date,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 10.5,
+                                color: _C.textGrey,
+                              ),
+                            ),
                           ),
                           if (artikel.readMinutes != null) ...[
-                            const SizedBox(width: 10),
-                            const Icon(Icons.schedule_rounded,
-                                size: 12, color: _C.textGrey),
-                            const SizedBox(width: 4),
-                            Text(
-                              '${artikel.readMinutes} mnt baca',
-                              style: const TextStyle(
-                                  fontSize: 10.5, color: _C.textGrey),
+                            const SizedBox(width: 6),
+                            const Icon(
+                              Icons.schedule_rounded,
+                              size: 12,
+                              color: _C.textGrey,
+                            ),
+                            const SizedBox(width: 3),
+                            Flexible(
+                              child: Text(
+                                '${artikel.readMinutes} mnt baca',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 10.5,
+                                  color: _C.textGrey,
+                                ),
+                              ),
                             ),
                           ],
                         ],
@@ -336,9 +433,13 @@ class _ArtikelListCard extends StatelessWidget {
                     ],
                   ),
                 ),
+
                 const SizedBox(width: 6),
-                const Icon(Icons.chevron_right_rounded,
-                    size: 22, color: _C.accentDark),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  size: 22,
+                  color: _C.accentDark,
+                ),
               ],
             ),
           ),
@@ -348,9 +449,10 @@ class _ArtikelListCard extends StatelessWidget {
   }
 }
 
-// ===========================================================================
-//  GAMBAR KARTU (anti-kosong, ada fallback)
-// ===========================================================================
+// =======================================================================
+// GAMBAR KARTU ARTIKEL — DENGAN FALLBACK
+// =======================================================================
+
 class _CardImage extends StatelessWidget {
   const _CardImage({required this.url});
 
@@ -366,17 +468,25 @@ class _CardImage extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [Color(0xFFEFE3CF), Color(0xFFE0CDAF)],
+              colors: [
+                Color(0xFFEFE3CF),
+                Color(0xFFE0CDAF),
+              ],
             ),
           ),
           alignment: Alignment.center,
-          child: const Icon(Icons.health_and_safety_rounded,
-              color: Color(0xFFB99B6B), size: 30),
+          child: const Icon(
+            Icons.health_and_safety_rounded,
+            color: Color(0xFFB99B6B),
+            size: 30,
+          ),
         ),
         Image.network(
           url,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+          errorBuilder: (context, error, stackTrace) {
+            return const SizedBox.shrink();
+          },
         ),
       ],
     );
