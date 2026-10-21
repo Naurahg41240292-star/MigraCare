@@ -1,3 +1,4 @@
+import 'admin_laporan.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -102,7 +103,7 @@ class _AdminBerandaPageState extends State<AdminBerandaPage> {
           index: _index,
           children: [
             _dashboard(),
-            _placeholder('Laporan'),
+            const AdminLaporanPage(),
             _placeholder('Artikel'),
             _kelolaUserTab(),
           ],
