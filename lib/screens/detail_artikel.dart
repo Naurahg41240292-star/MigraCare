@@ -137,7 +137,7 @@ class _TitleCard extends StatelessWidget {
         border: Border.all(color: _C.outline),
         boxShadow: [
           BoxShadow(
-            color: Colors.brown.withOpacity(0.08),
+            color: Colors.brown.withValues(alpha: 0.08),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),
@@ -319,7 +319,7 @@ class _ArticleImage extends StatelessWidget {
         Image.network(
           url,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+          errorBuilder: (_, _, _) => const SizedBox.shrink(),
         ),
       ],
     );

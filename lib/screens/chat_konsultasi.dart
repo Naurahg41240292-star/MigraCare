@@ -594,3 +594,4 @@ class _DialogRingkasanState extends State<_DialogRingkasan> {
     );
   }
 }
+

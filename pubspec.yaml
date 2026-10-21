@@ -27,6 +27,7 @@ dependencies:
   latlong2: ^0.10.1
   firebase_messaging: ^16.7.0
   firebase_storage: ^13.6.0
+  intl: ^0.20.3
 
 dev_dependencies:
   flutter_test:
@@ -41,6 +42,7 @@ flutter:
 
   assets:
     - assets/images/
+
 
   # To add custom fonts to your application, add a fonts section here,
   # in this "flutter" section. Each entry in this list contains a
@@ -69,4 +71,7 @@ flutter_launcher_icons:
   ios: true
   adaptive_icon_background: "#FAF4EA"
   adaptive_icon_foreground: "assets/images/launcher_logo.png"
+
   remove_alpha_ios: true
+
+
