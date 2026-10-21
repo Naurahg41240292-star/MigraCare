@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dokter_detail_pasien.dart';
 
 /// ==========================================================================
 ///  MIGRACARE — Chat Pasien ↔ Dokter (berbasis Booking, realtime Firestore)
 ///  - Timer 30 menit (revisi #2): dimulai saat chat pertama dibuka
 ///  - Dokter bisa kirim pesan REKOMENDASI (tampil khusus)
+///  - [BARU] Titik tiga kanan atas -> Detail Pasien (khusus dokter)
 ///  File: lib/screens/dokter/chat_booking.dart
 ///  ✅ Mandiri: warna internal (_Cb) — tidak bergantung theme.dart
 /// ==========================================================================
@@ -189,6 +191,26 @@ class _ChatBookingPageState extends State<ChatBookingPage> {
     });
   }
 
+  void _bukaDetailPasien() {
+    final uid = widget.booking['pasienUid']?.toString() ?? '';
+    if (uid.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Data pasien tidak ditemukan di booking ini.')),
+      );
+      return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => DetailPasienView(
+          pasienUid: uid,
+          pasienNama: _namaLawan,
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _ticker?.cancel();
@@ -228,6 +250,14 @@ class _ChatBookingPageState extends State<ChatBookingPage> {
             ),
           ],
         ),
+        actions: [
+          if (widget.sayaDokter)
+            IconButton(
+              onPressed: _bukaDetailPasien,
+              tooltip: 'Detail Pasien',
+              icon: const Icon(Icons.more_vert_rounded, color: _Cb.textDark),
+            ),
+        ],
       ),
       body: Column(
         children: [
