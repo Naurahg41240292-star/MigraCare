@@ -1,16 +1,9 @@
 import 'package:flutter/material.dart';
 import '../models/obat.dart';
+import '../services/notifikasi_service.dart'; // ← SESUAIKAN NAMA FILE
 import 'tambah_obat.dart';
 import 'riwayat_pengingat.dart';
 import 'atur_jadwal.dart';
-
-/// ==========================================================================
-///  MIGRACARE — Halaman Utama Pengingat Obat (v2.3)
-///  - Tanpa kartu "Obat Berikutnya" (notif cukup 1: daftar jadwal)
-///  - Baris jadwal = toggle dua arah (sudah <-> belum)
-///  - Tekan lama baris = hapus obat
-///  File: lib/screens/pengingat_obat.dart
-/// ==========================================================================
 
 class PengingatObatPage extends StatefulWidget {
   const PengingatObatPage({super.key});
@@ -41,7 +34,32 @@ class _PengingatObatPageState extends State<PengingatObatPage> {
   Future<void> _muat() async {
     await PengingatStore.instance.muatDariDisk();
     PengingatStore.instance.sinkronkanRiwayatHariIni();
+
+    // ===== TAMBAHAN: reschedule semua saat app buka =====
+    if (pengingatAktif) {
+      await NotificationService.instance.rescheduleSemua();
+    }
+
     if (mounted) setState(() {});
+  }
+
+  // ===== HANDLER SWITCH =====
+  Future<void> _togglePengingat(bool value) async {
+    setState(() => pengingatAktif = value);
+
+    if (value) {
+      await NotificationService.instance.rescheduleSemua();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pengingat obat diaktifkan ✓')),
+      );
+    } else {
+      await NotificationService.instance.batalkanSemua();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pengingat obat dimatikan')),
+      );
+    }
   }
 
   @override
@@ -71,7 +89,7 @@ class _PengingatObatPageState extends State<PengingatObatPage> {
                 Switch(
                   value: pengingatAktif,
                   activeColor: accent,
-                  onChanged: (v) => setState(() => pengingatAktif = v),
+                  onChanged: _togglePengingat,
                 ),
               ],
             )),
@@ -166,8 +184,6 @@ class _PengingatObatPageState extends State<PengingatObatPage> {
       ),
     );
   }
-
-  // ============ WIDGET BANTU ============
 
   Widget _kartu(Widget child) {
     return Container(
@@ -307,8 +323,7 @@ class _PengingatObatPageState extends State<PengingatObatPage> {
     );
   }
 
-  // ============ AKSI ============
-
+  // ===== _konfirmasiHapus DENGAN BATALKAN NOTIF =====
   Future<void> _konfirmasiHapus(Obat obat) async {
     final yakin = await showDialog<bool>(
       context: context,
@@ -339,11 +354,17 @@ class _PengingatObatPageState extends State<PengingatObatPage> {
 
     if (yakin == true) {
       setState(() => PengingatStore.instance.hapusObat(obat.id));
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Obat "${obat.nama}" dihapus')),
-        );
+
+      try {
+        await NotificationService.instance.batalkanObat(obat);
+      } catch (e) {
+        debugPrint('Gagal batalkan notifikasi: $e');
       }
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Obat "${obat.nama}" dihapus')),
+      );
     }
   }
 
@@ -395,6 +416,15 @@ class _PengingatObatPageState extends State<PengingatObatPage> {
       context,
       MaterialPageRoute(builder: (_) => AturJadwalPage(obat: terpilih)),
     );
+
+    // Reschedule obat yang baru diatur jadwalnya
+    try {
+      await NotificationService.instance.batalkanObat(terpilih);
+      await NotificationService.instance.jadwalkanObat(terpilih);
+    } catch (e) {
+      debugPrint('Gagal reschedule obat: $e');
+    }
+
     setState(() {});
   }
 }

@@ -1,10 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/obat.dart';
-
-/// ==========================================================================
-///  MIGRACARE — Halaman Tambah Obat
-///  File: lib/screens/tambah_obat.dart
-/// ==========================================================================
+import '../services/notifikasi_service.dart';
 
 class TambahObatPage extends StatefulWidget {
   const TambahObatPage({super.key});
@@ -20,6 +16,8 @@ class _TambahObatPageState extends State<TambahObatPage> {
   static const Color orange = Color(0xFFDE8500);
   static const Color textDark = Color(0xFF33261A);
   static const Color textGrey = Color(0xFF9C948A);
+  static const Color surface = Colors.white;
+  static const Color outline = Color(0xFFEDE3D4);
 
   final _namaC = TextEditingController();
   final _dosisC = TextEditingController();
@@ -28,7 +26,21 @@ class _TambahObatPageState extends State<TambahObatPage> {
   final _catatanMinumC = TextEditingController();
 
   String _aturanPakai = '2x sehari';
-  static const _pilihanAturan = ['1x sehari', '2x sehari', '3x sehari', 'Lainnya'];
+  static const _pilihanAturan = ['1x sehari', '2x sehari', '3x sehari'];
+
+  // ===== LIST JAM CUSTOM (bisa diubah user via TimePicker) =====
+  // Default ngikutin aturan pakai, tapi user bisa edit bebas
+  List<TimeOfDay> _jamList = [];
+
+  // Label untuk masing-masing slot jam (estetika doang)
+  static const _labelJam = ['Pagi', 'Siang', 'Malam'];
+  static const _ikonJam = [Icons.wb_sunny, Icons.light_mode, Icons.nights_stay];
+
+  @override
+  void initState() {
+    super.initState();
+    _resetJamDariAturan();
+  }
 
   @override
   void dispose() {
@@ -40,21 +52,79 @@ class _TambahObatPageState extends State<TambahObatPage> {
     super.dispose();
   }
 
-  /// Jam minum otomatis mengikuti aturan pakai
-  List<String> _jamDariAturan(String aturan) {
-    switch (aturan) {
+  /// Reset jam ke default berdasarkan aturan pakai
+  void _resetJamDariAturan() {
+    switch (_aturanPakai) {
       case '1x sehari':
-        return ['08.00'];
+        _jamList = [const TimeOfDay(hour: 8, minute: 0)];
+        break;
       case '2x sehari':
-        return ['08.00', '20.00'];
+        _jamList = [
+          const TimeOfDay(hour: 8, minute: 0),
+          const TimeOfDay(hour: 20, minute: 0),
+        ];
+        break;
       case '3x sehari':
-        return ['08.00', '14.00', '20.00'];
+        _jamList = [
+          const TimeOfDay(hour: 8, minute: 0),
+          const TimeOfDay(hour: 14, minute: 0),
+          const TimeOfDay(hour: 20, minute: 0),
+        ];
+        break;
       default:
-        return ['08.00'];
+        _jamList = [const TimeOfDay(hour: 8, minute: 0)];
     }
   }
 
-  void _simpan() {
+  /// Format TimeOfDay → "HH.MM" (format yang dipakai di model Obat)
+  String _formatJam(TimeOfDay t) {
+    final h = t.hour.toString().padLeft(2, '0');
+    final m = t.minute.toString().padLeft(2, '0');
+    return '$h.$m';
+  }
+
+  /// Format TimeOfDay → "HH:MM" (untuk tampilan UI)
+  String _formatJamUI(TimeOfDay t) {
+    final h = t.hour.toString().padLeft(2, '0');
+    final m = t.minute.toString().padLeft(2, '0');
+    return '$h:$m';
+  }
+
+  /// Buka TimePicker saat user tap card jam
+  Future<void> _bukaTimePicker(int index) async {
+    final terpilih = await showTimePicker(
+      context: context,
+      initialTime: _jamList[index],
+      helpText: 'Pilih jam minum obat',
+      cancelText: 'Batal',
+      confirmText: 'Pilih',
+      hourLabelText: 'Jam',
+      minuteLabelText: 'Menit',
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: Theme.of(context).colorScheme.copyWith(
+                  primary: orange,
+                ),
+            timePickerTheme: const TimePickerThemeData(
+              hourMinuteColor: fieldFill,
+              dialHandColor: orange,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (terpilih != null) {
+      setState(() {
+        _jamList[index] = terpilih;
+      });
+    }
+  }
+
+  // ============ _simpan() DENGAN JAM CUSTOM ============
+  Future<void> _simpan() async {
     final nama = _namaC.text.trim();
     if (nama.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -63,7 +133,18 @@ class _TambahObatPageState extends State<TambahObatPage> {
       return;
     }
 
-    PengingatStore.instance.tambahObat(Obat(
+    // Validasi: pastikan semua jam sudah diisi
+    if (_jamList.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Jam minum obat belum diatur')),
+      );
+      return;
+    }
+
+    // Konversi List<TimeOfDay> → List<String> "HH.MM"
+    final jamListString = _jamList.map(_formatJam).toList();
+
+    final obatBaru = Obat(
       id: PengingatStore.buatId(),
       nama: nama,
       dosis: _dosisC.text.trim(),
@@ -71,10 +152,21 @@ class _TambahObatPageState extends State<TambahObatPage> {
           _bentukC.text.trim().isEmpty ? 'Tablet' : _bentukC.text.trim(),
       catatan: _catatanC.text.trim(),
       aturanPakai: _aturanPakai,
-      jamList: _jamDariAturan(_aturanPakai),
+      jamList: jamListString,
       catatanMinum: _catatanMinumC.text.trim(),
-    ));
+    );
 
+    // 1. Simpan ke store lokal
+    PengingatStore.instance.tambahObat(obatBaru);
+
+    // 2. Jadwalkan notifikasi untuk semua jam
+    try {
+      await NotificationService.instance.jadwalkanObat(obatBaru);
+    } catch (e) {
+      debugPrint('Gagal jadwalkan notifikasi: $e');
+    }
+
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Obat "$nama" berhasil ditambahkan ✓')),
     );
@@ -116,6 +208,7 @@ class _TambahObatPageState extends State<TambahObatPage> {
                 hint: 'Contoh: Jangan diminum bersama kopi', maxLines: 3),
             const SizedBox(height: 16),
 
+            // ===== ATURAN PAKAI (sekaligus tentukan jumlah slot jam) =====
             _label('Aturan Pakai'),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -131,11 +224,43 @@ class _TambahObatPageState extends State<TambahObatPage> {
                   items: _pilihanAturan
                       .map((e) => DropdownMenuItem(value: e, child: Text(e)))
                       .toList(),
-                  onChanged: (v) =>
-                      setState(() => _aturanPakai = v ?? _aturanPakai),
+                  onChanged: (v) {
+                    if (v == null) return;
+                    setState(() {
+                      _aturanPakai = v;
+                      _resetJamDariAturan();
+                    });
+                  },
                 ),
               ),
             ),
+            const SizedBox(height: 16),
+
+            // ===== JAM MINUM (CUSTOM — pakai TimePicker) =====
+            Row(
+              children: [
+                const Expanded(
+                  child: Text('Jam Minum',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: textDark)),
+                ),
+                TextButton.icon(
+                  onPressed: () => setState(_resetJamDariAturan),
+                  icon: const Icon(Icons.refresh_rounded, size: 16),
+                  label: const Text('Reset',
+                      style: TextStyle(fontSize: 12)),
+                  style: TextButton.styleFrom(foregroundColor: orange),
+                ),
+              ],
+            ),
+            const Text(
+              'Ketuk kartu jam untuk mengubah waktunya sesuai keinginanmu.',
+              style: TextStyle(fontSize: 11.5, color: textGrey),
+            ),
+            const SizedBox(height: 8),
+            _buildJamList(),
             const SizedBox(height: 16),
 
             _label('Catatan Minum (Opsional)'),
@@ -162,6 +287,84 @@ class _TambahObatPageState extends State<TambahObatPage> {
           ],
         ),
       ),
+    );
+  }
+
+  // ===== WIDGET: LIST JAM (CUSTOM TIMEPICKER) =====
+  Widget _buildJamList() {
+    return Column(
+      children: List.generate(_jamList.length, (i) {
+        final jam = _jamList[i];
+        final label = i < _labelJam.length ? _labelJam[i] : 'Jam ${i + 1}';
+        final ikon = i < _ikonJam.length ? _ikonJam[i] : Icons.schedule;
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: InkWell(
+            onTap: () => _bukaTimePicker(i),
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: outline),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: fieldFill,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(ikon, color: orange, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(label,
+                            style: const TextStyle(
+                                fontSize: 11, color: textGrey)),
+                        const SizedBox(height: 2),
+                        Text(_formatJamUI(jam),
+                            style: const TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w800,
+                              color: textDark,
+                            )),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: fieldFill,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(Icons.edit_rounded, size: 14, color: orange),
+                        SizedBox(width: 4),
+                        Text('Ubah',
+                            style: TextStyle(
+                                fontSize: 11,
+                                color: orange,
+                                fontWeight: FontWeight.w700)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }),
     );
   }
 
