@@ -16,8 +16,8 @@ import 'package:google_fonts/google_fonts.dart';
 
 // ============ ⚙️ KONFIGURASI — cukup ubah bagian ini saja ============
 const String kKoleksiPengguna = 'users';
-const List<String> kKoleksiArtikel = ['artikel', 'articles']; // dicoba berurutan
-const String kKoleksiLayanan = 'screenings'; // subkoleksi di users/{uid}
+const String kKoleksiArtikel = 'artikel'; // koleksi artikel (ditulis admin)
+const String kKoleksiLayanan = 'layanan'; // koleksi faskes (ditulis admin)
 
 const List<String> kPathTanggal = [
   'createdAt', 'dibuatPada', 'dibuat', 'tanggalDibuat', 'dibuat_pada',
@@ -133,24 +133,16 @@ class _AdminLaporanPageState extends State<AdminLaporanPage> {
   // ==================== AMBIL DATA FIREBASE ====================
   Future<QuerySnapshot<Map<String, dynamic>>> _ambilSnapshot() async {
     final db = FirebaseFirestore.instance;
-
-    if (_tab == TabLaporan.layanan) {
-      // screenings adalah SUBKOLEKSI users/{uid}/screenings
-      // → pakai collectionGroup supaya terkumpul dari semua user
-      final grup = await db.collectionGroup(kKoleksiLayanan).get();
-      if (grup.docs.isNotEmpty) return grup;
-      return await db.collection('layanan').get(); // fallback
-    }
-
-    final kandidat = _tab == TabLaporan.pengguna
-        ? [kKoleksiPengguna]
-        : kKoleksiArtikel;
-
-    for (final nama in kandidat) {
-      final snap = await db.collection(nama).get();
-      if (snap.docs.isNotEmpty) return snap;
-    }
-    return await db.collection(kandidat.first).get();
+    // Semua tab baca koleksi utama yang SUDAH ada rules-nya:
+    // users / artikel / layanan (koleksi yang ditulis admin).
+    // ⚠️ Jangan pakai collectionGroup('screenings') — query itu butuh
+    //    rules wildcard khusus dan bukan maksud tab "Layanan" lagi.
+    final nama = switch (_tab) {
+      TabLaporan.pengguna => kKoleksiPengguna,
+      TabLaporan.artikel => kKoleksiArtikel,
+      TabLaporan.layanan => kKoleksiLayanan,
+    };
+    return db.collection(nama).get();
   }
 
   Future<_DataLaporan> _muatData() async {
@@ -240,8 +232,10 @@ class _AdminLaporanPageState extends State<AdminLaporanPage> {
     }).toList()
       ..sort((a, b) => b.jumlah.compareTo(a.jumlah));
 
-    return _DataLaporan(
-        total, persen, grafik, rincian, pathTanggal != null);
+    // Banner "tanggal tidak ditemukan" hanya kalau datanya memang ada
+    // (kalau koleksi kosong, banner malah membingungkan).
+    return _DataLaporan(total, persen, grafik, rincian,
+        docs.isNotEmpty && pathTanggal != null);
   }
 
   String _nilaiGrup(Map<String, dynamic> data, String? path) {
@@ -601,8 +595,8 @@ class _AdminLaporanPageState extends State<AdminLaporanPage> {
   }
 
   Widget _bottomNav() {
-    // ⚠️ Kalau bottom nav sudah ada di admin_panel.dart, hapus baris
-    //    "_bottomNav()," di atas dan method ini.
+    // ⚠️ Kalau bottom nav sudah ada di admin_beranda.dart, method ini
+    //    tidak dipakai — biarkan saja, tidak mengganggu.
     const items = [
       (Icons.home_outlined, 'Beranda'),
       (Icons.bar_chart_outlined, 'Laporan'),
