@@ -401,9 +401,6 @@ class _DokterBerandaViewState extends State<DokterBerandaView> {
                       const SizedBox(width: 12),
                       _aksesCepat(Icons.groups_rounded, 'Riwayat Pasien',
                           () => widget.onPindahTab?.call(3)),
-                      const SizedBox(width: 12),
-                      _aksesCepat(Icons.article_rounded, 'Artikel',
-                          () => _snackMenyusul(context)),
                     ],
                   ),
                   const SizedBox(height: 24),
@@ -411,11 +408,6 @@ class _DokterBerandaViewState extends State<DokterBerandaView> {
               ),
             ),
     );
-  }
-
-  void _snackMenyusul(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Kelola artikel menyusul (butuh koleksi Firestore)')));
   }
 
   Widget _statItem(IconData icon, String label, String nilai) {
