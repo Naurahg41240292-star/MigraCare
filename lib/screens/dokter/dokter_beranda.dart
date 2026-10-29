@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'chat_booking.dart';
 import 'lonceng_notifikasi.dart';
+import 'dart:convert';
+import 'dokter_profil.dart';
 
 abstract class _Bd {
   static const Color bg = Color(0xFFFAF4EA);
@@ -31,6 +33,7 @@ class _DokterBerandaViewState extends State<DokterBerandaView> {
   @override
   void initState() {
     super.initState();
+    muatFotoDokterGlobal();
     _muat();
   }
 
@@ -147,11 +150,19 @@ class _DokterBerandaViewState extends State<DokterBerandaView> {
           ),
           IconButton(
             onPressed: () => widget.onPindahTab?.call(4),
-            icon: const CircleAvatar(
-              radius: 14,
-              backgroundColor: Color(0xFFC9822E),
-              child: Icon(Icons.person_rounded,
-                  size: 16, color: Colors.white),
+            icon: ValueListenableBuilder<String?>(
+              valueListenable: fotoDokterNotifier,
+              builder: (context, foto, _) => CircleAvatar(
+                radius: 14,
+                backgroundColor: const Color(0xFFC9822E),
+                backgroundImage: foto != null
+                    ? MemoryImage(base64Decode(foto))
+                    : null,
+                child: foto == null
+                    ? const Icon(Icons.person_rounded,
+                        size: 16, color: Colors.white)
+                    : null,
+              ),
             ),
           ),
           const SizedBox(width: 8),

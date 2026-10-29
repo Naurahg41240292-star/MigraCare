@@ -4,6 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../auth/masuk.dart';
 import '../keamanan_akun.dart';
 import 'dokter_notifikasi.dart';
+import 'dart:convert';
+import 'package:image_picker/image_picker.dart';
 
 class _Pf {
   static const bg = Color(0xFFFAF4EA);
@@ -29,6 +31,7 @@ class _DokterProfilViewState extends State<DokterProfilView> {
   String _nama = '';
   String _email = '';
   DateTime? _bergabung;
+  String? _fotoProfil;
 
   @override
   void initState() {
@@ -53,9 +56,12 @@ class _DokterProfilViewState extends State<DokterProfilView> {
             .get();
         final data = doc.data() ?? {};
 
-        final profile = data['profile'];
+                final profile = data['profile'];
         if (profile is Map) {
           nama = (profile['namaLengkap'] ?? '').toString().trim();
+          final foto = (profile['fotoBase64'] ?? '').toString();
+          _fotoProfil = foto.isEmpty ? null : foto;
+          fotoDokterNotifier.value = _fotoProfil; // ← baru
         }
         final akun = data['akun'];
         if (akun is Map) {
@@ -121,13 +127,13 @@ class _DokterProfilViewState extends State<DokterProfilView> {
     );
   }
 
-  void _editProfil() {
-    _dialogSederhana(
-      'Edit Profil',
-      'Fitur edit profil untuk dokter sedang disiapkan. '
-          'Untuk sekarang, data profil diambil dari data saat pendaftaran akun.',
-      Icons.edit_rounded,
+  Future<void> _editProfil() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const _EditProfilDokterPage()),
     );
+    if (!mounted) return;
+    muatUlang();
   }
 
   Future<void> _konfirmasiKeluar() async {
@@ -491,5 +497,492 @@ class _TentangMigraCarePage extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+// ============================================================
+// HALAMAN EDIT PROFIL DOKTER
+// ============================================================
+class _EditProfilDokterPage extends StatefulWidget {
+  const _EditProfilDokterPage({super.key});
+
+  @override
+  State<_EditProfilDokterPage> createState() => _EditProfilDokterPageState();
+}
+
+class _EditProfilDokterPageState extends State<_EditProfilDokterPage> {
+  static const List<String> _bulan = [
+    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
+  ];
+
+  final _formKey = GlobalKey<FormState>();
+  final _namaC = TextEditingController();
+  final _spesialisasiC = TextEditingController();
+  final _teleponC = TextEditingController();
+  final _bioC = TextEditingController();
+
+  final ImagePicker _picker = ImagePicker();
+
+  String _email = '';
+  DateTime? _tanggalLahir;
+  String _jenisKelamin = '';
+  String? _fotoBase64; // foto disimpan base64 di Firestore (tanpa Storage)
+  bool _menyimpan = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _muatDataLama();
+  }
+
+  @override
+  void dispose() {
+    _namaC.dispose();
+    _spesialisasiC.dispose();
+    _teleponC.dispose();
+    _bioC.dispose();
+    super.dispose();
+  }
+
+  String get _tanggalText {
+    final t = _tanggalLahir;
+    if (t == null) return 'Pilih tanggal lahir';
+    return '${t.day} ${_bulan[t.month - 1]} ${t.year}';
+  }
+
+  // ---------------- MUAT DATA LAMA ----------------
+  Future<void> _muatDataLama() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    final doc =
+        await FirebaseFirestore.instance.collection('users').doc(uid).get();
+    final data = doc.data();
+    final profile = (data?['profile'] as Map?) ?? const {};
+    final akun = (data?['akun'] as Map?) ?? const {};
+    if (!mounted) return;
+    setState(() {
+      _namaC.text = (profile['namaLengkap'] ?? '').toString();
+      _spesialisasiC.text = (profile['spesialisasi'] ?? '').toString();
+      _teleponC.text = (profile['noTelepon'] ?? '').toString();
+      _bioC.text = (profile['bio'] ?? '').toString();
+      _email = (akun['email'] ?? '').toString();
+      _jenisKelamin = (profile['jenisKelamin'] ?? '').toString();
+      final foto = (profile['fotoBase64'] ?? '').toString();
+      _fotoBase64 = foto.isEmpty ? null : foto;
+      final tgl = (profile['tanggalLahir'] ?? '').toString();
+      if (tgl.length >= 10) _tanggalLahir = DateTime.tryParse(tgl);
+    });
+  }
+
+  // ---------------- SIMPAN ----------------
+  Future<void> _simpan() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _menyimpan = true);
+    try {
+      final uid = FirebaseAuth.instance.currentUser!.uid;
+      final nama = _namaC.text.trim();
+
+      final profile = <String, dynamic>{
+        'namaLengkap': nama,
+        'spesialisasi': _spesialisasiC.text.trim(),
+        'noTelepon': _teleponC.text.trim(),
+        'jenisKelamin': _jenisKelamin,
+        'bio': _bioC.text.trim(),
+      };
+      if (_tanggalLahir != null) {
+        profile['tanggalLahir'] =
+            '${_tanggalLahir!.year}-${_tanggalLahir!.month.toString().padLeft(2, '0')}-${_tanggalLahir!.day.toString().padLeft(2, '0')}';
+      }
+      if (_fotoBase64 != null) profile['fotoBase64'] = _fotoBase64;
+
+      await FirebaseFirestore.instance.collection('users').doc(uid).set({
+        'profile': profile,
+        'akun': {'namaLengkap': nama},
+      }, SetOptions(merge: true));
+      fotoDokterNotifier.value = _fotoBase64;
+
+      if (!mounted) return;
+      final messenger = ScaffoldMessenger.of(context);
+      Navigator.pop(context);
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Profil berhasil diperbarui')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _menyimpan = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal menyimpan: $e')),
+      );
+    }
+  }
+
+  // ---------------- FOTO ----------------
+  void _pilihFoto() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 14),
+            const Text(
+              'Ganti Foto Profil',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: _Pf.textDark,
+              ),
+            ),
+            const SizedBox(height: 8),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined,
+                  color: _Pf.gold),
+              title: const Text('Pilih dari Galeri'),
+              onTap: () => _ambilFoto(ImageSource.gallery),
+            ),
+            ListTile(
+              leading:
+                  const Icon(Icons.photo_camera_outlined, color: _Pf.gold),
+              title: const Text('Ambil Foto dengan Kamera'),
+              onTap: () => _ambilFoto(ImageSource.camera),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _ambilFoto(ImageSource sumber) async {
+    Navigator.pop(context);
+    try {
+      final XFile? foto = await _picker.pickImage(
+        source: sumber,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 70, // kompres biar base64 tidak melebihi batas Firestore
+      );
+      if (foto == null) return;
+      final bytes = await foto.readAsBytes();
+      if (!mounted) return;
+      setState(() => _fotoBase64 = base64Encode(bytes));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal memuat foto: $e')),
+      );
+    }
+  }
+
+  // ---------------- TANGGAL LAHIR ----------------
+  Future<void> _pilihTanggal() async {
+    final dipilih = await showDatePicker(
+      context: context,
+      initialDate: _tanggalLahir ?? DateTime(2000),
+      firstDate: DateTime(1945),
+      lastDate: DateTime.now(),
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: const ColorScheme.light(primary: _Pf.gold),
+        ),
+        child: child!,
+      ),
+    );
+    if (dipilih != null) setState(() => _tanggalLahir = dipilih);
+  }
+
+  // ---------------- JENIS KELAMIN ----------------
+  void _pilihJenisKelamin() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 14),
+            const Text(
+              'Jenis Kelamin',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: _Pf.textDark,
+              ),
+            ),
+            const SizedBox(height: 8),
+            ListTile(
+              leading: const Icon(Icons.male, color: _Pf.gold),
+              title: const Text('Laki-laki'),
+              trailing: _jenisKelamin == 'Laki-laki'
+                  ? const Icon(Icons.check, color: _Pf.gold)
+                  : null,
+              onTap: () {
+                Navigator.pop(sheetContext);
+                setState(() => _jenisKelamin = 'Laki-laki');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.female, color: _Pf.gold),
+              title: const Text('Perempuan'),
+              trailing: _jenisKelamin == 'Perempuan'
+                  ? const Icon(Icons.check, color: _Pf.gold)
+                  : null,
+              onTap: () {
+                Navigator.pop(sheetContext);
+                setState(() => _jenisKelamin = 'Perempuan');
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ---------------- UI ----------------
+  @override
+  Widget build(BuildContext context) {
+    final nama = _namaC.text.trim();
+    final huruf = nama.isEmpty ? 'D' : nama[0].toUpperCase();
+
+    return Scaffold(
+      backgroundColor: _Pf.bg,
+      appBar: AppBar(
+        backgroundColor: _Pf.bg,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: _Pf.textDark),
+        title: const Text(
+          'Edit Profil',
+          style: TextStyle(
+            color: _Pf.textDark,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: _menyimpan ? null : _simpan,
+            child: _menyimpan
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: _Pf.gold,
+                    ),
+                  )
+                : const Text(
+                    'Simpan',
+                    style: TextStyle(
+                      color: _Pf.gold,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+          ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: GestureDetector(
+                  onTap: _pilihFoto,
+                  child: Column(
+                    children: [
+                      CircleAvatar(
+                        radius: 52,
+                        backgroundColor: _Pf.goldSoft,
+                        backgroundImage: _fotoBase64 != null
+                            ? MemoryImage(base64Decode(_fotoBase64!))
+                            : null,
+                        child: _fotoBase64 == null
+                            ? Text(
+                                huruf,
+                                style: const TextStyle(
+                                  fontSize: 40,
+                                  fontWeight: FontWeight.bold,
+                                  color: _Pf.gold,
+                                ),
+                              )
+                            : null,
+                      ),
+                      const SizedBox(height: 10),
+                      const Text(
+                        'Ketuk foto untuk mengganti',
+                        style: TextStyle(fontSize: 12, color: _Pf.textGrey),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              _label('Nama Lengkap'),
+              _kotakInput(
+                controller: _namaC,
+                hint: 'Contoh: dr. Andi Pratama',
+                validator: (v) => (v == null || v.trim().isEmpty)
+                    ? 'Nama tidak boleh kosong'
+                    : null,
+              ),
+              const SizedBox(height: 16),
+              _label('Email'),
+              _kotakInput(
+                controller: TextEditingController(text: _email),
+                hint: '-',
+                readOnly: true,
+                fillColor: const Color(0xFFF6F1E7),
+                helperText: 'Email tidak dapat diubah',
+              ),
+              const SizedBox(height: 16),
+              _label('Spesialisasi'),
+              _kotakInput(
+                controller: _spesialisasiC,
+                hint: 'Contoh: Dokter Umum / Neurologi',
+              ),
+              const SizedBox(height: 16),
+              _label('No. Telepon'),
+              _kotakInput(
+                controller: _teleponC,
+                hint: 'Contoh: 0812xxxxxxx',
+                keyboardType: TextInputType.phone,
+                validator: (v) {
+                  final t = (v ?? '').trim();
+                  if (t.isEmpty) return null;
+                  if (t.length < 9) return 'Nomor telepon tidak valid';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              _label('Tanggal Lahir'),
+              _kotakInput(
+                controller: TextEditingController(text: _tanggalText),
+                hint: 'Pilih tanggal lahir',
+                readOnly: true,
+                onTap: _pilihTanggal,
+                suffix: const Icon(Icons.calendar_today_outlined,
+                    size: 20, color: _Pf.textGrey),
+              ),
+              const SizedBox(height: 16),
+              _label('Jenis Kelamin'),
+              _kotakInput(
+                controller:
+                    TextEditingController(text: _jenisKelamin),
+                hint: 'Pilih jenis kelamin',
+                readOnly: true,
+                onTap: _pilihJenisKelamin,
+                suffix: const Icon(Icons.keyboard_arrow_down_rounded,
+                    color: _Pf.textGrey),
+              ),
+              const SizedBox(height: 16),
+              _label('Bio (Opsional)'),
+              _kotakInput(
+                controller: _bioC,
+                hint: 'Ceritakan sedikit tentang diri kamu',
+                maxLines: 3,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _label(String teks) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8, left: 4),
+      child: Text(
+        teks,
+        style: const TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: _Pf.textGrey,
+        ),
+      ),
+    );
+  }
+
+  Widget _kotakInput({
+    required TextEditingController controller,
+    required String hint,
+    TextInputType? keyboardType,
+    int maxLines = 1,
+    bool readOnly = false,
+    VoidCallback? onTap,
+    Widget? suffix,
+    Color? fillColor,
+    String? helperText,
+    String? Function(String?)? validator,
+  }) {
+    return TextFormField(
+      controller: controller,
+      keyboardType: keyboardType,
+      maxLines: maxLines,
+      readOnly: readOnly,
+      onTap: onTap,
+      validator: validator,
+      style: const TextStyle(color: _Pf.textDark),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: const TextStyle(color: _Pf.textGrey),
+        helperText: helperText,
+        helperStyle: const TextStyle(fontSize: 11, color: _Pf.textGrey),
+        suffixIcon: suffix,
+        filled: true,
+        fillColor: fillColor ?? Colors.white,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: _Pf.outline),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: _Pf.gold, width: 1.5),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: _Pf.merah),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: _Pf.merah, width: 1.5),
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================
+// NOTIFIER GLOBAL FOTO PROFIL DOKTER
+// Dipakai bareng: header profil, AppBar beranda, dst.
+// ============================================================
+final ValueNotifier<String?> fotoDokterNotifier = ValueNotifier<String?>(null);
+
+/// Ambil foto dari Firestore & nyalakan notifier
+Future<void> muatFotoDokterGlobal() async {
+  try {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .get();
+    final data = doc.data() ?? const {};
+    final profile = data['profile'];
+    final foto =
+        profile is Map ? (profile['fotoBase64'] ?? '').toString() : '';
+    fotoDokterNotifier.value = foto.isEmpty ? null : foto;
+  } catch (_) {
+    // diamkan — foto lama tetap dipakai
   }
 }
