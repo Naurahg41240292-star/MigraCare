@@ -7,7 +7,10 @@ import 'dokter_detail_pasien.dart';
 ///  MIGRACARE — Chat Pasien ↔ Dokter (berbasis Booking, realtime Firestore)
 ///  - Timer 30 menit (revisi #2): dimulai saat chat pertama dibuka
 ///  - Dokter bisa kirim pesan REKOMENDASI (tampil khusus)
-///  - [BARU] Titik tiga kanan atas -> Detail Pasien (khusus dokter)
+///  - Titik tiga kanan atas -> Detail Pasien (khusus dokter)
+///  - [BARU] Gerbang jadwal: chat terkunci sampai TEPAT jam booking.
+///    Sesi 30 menit baru dihitung mulai jam booking, bukan saat halaman
+///    dibuka lebih awal.
 ///  File: lib/screens/dokter/chat_booking.dart
 ///  ✅ Mandiri: warna internal (_Cb) — tidak bergantung theme.dart
 /// ==========================================================================
@@ -59,6 +62,10 @@ class _ChatBookingPageState extends State<ChatBookingPage> {
   Timer? _ticker;
   int _sisaDetik = -1;
 
+  // 🔒 [BARU] Gerbang jadwal: true = belum jam booking, chat terkunci
+  bool _gerbangTutup = false;
+  Timer? _gerbangTicker;
+
   FirebaseFirestore get _db => FirebaseFirestore.instance;
   DocumentReference<Map<String, dynamic>> get _bookingRef =>
       _db.collection('booking').doc(widget.bookingId);
@@ -73,10 +80,56 @@ class _ChatBookingPageState extends State<ChatBookingPage> {
       : (widget.booking['dokterNama'] ?? 'Dokter');
   String get _peranSaya => widget.sayaDokter ? 'dokter' : 'pasien';
 
+  // 🔒 [BARU] Waktu booking lengkap dari data booking (tanggal + jam)
+  // format tanggal: 'd/m/yyyy' — format jam: 'HH:mm'
+  DateTime? get _waktuBooking {
+    final tanggal = (widget.booking['tanggal'] ?? '').toString();
+    final jam = (widget.booking['jam'] ?? '').toString();
+    final pT = tanggal.split('/');
+    final pJ = jam.split(':');
+    if (pT.length != 3 || pJ.length != 2) return null;
+    final d = int.tryParse(pT[0].trim());
+    final m = int.tryParse(pT[1].trim());
+    final y = int.tryParse(pT[2].trim());
+    final h = int.tryParse(pJ[0].trim());
+    final mi = int.tryParse(pJ[1].trim());
+    if (d == null || m == null || y == null || h == null || mi == null) {
+      return null;
+    }
+    return DateTime(y, m, d, h, mi);
+  }
+
+  /// Countdown "terbuka dalam" (HH:MM:SS)
+  String get _hitungMundur {
+    final wb = _waktuBooking;
+    if (wb == null) return '--:--:--';
+    var sisa = wb.difference(DateTime.now()).inSeconds;
+    if (sisa < 0) sisa = 0;
+    String dua(int v) => v.toString().padLeft(2, '0');
+    return '${dua(sisa ~/ 3600)}:${dua((sisa % 3600) ~/ 60)}:${dua(sisa % 60)}';
+  }
+
   @override
   void initState() {
     super.initState();
-    _initChatMulai();
+    // 🔒 [BARU] Cek gerbang jadwal sebelum apa-apa
+    final wb = _waktuBooking;
+    _gerbangTutup = wb != null && DateTime.now().isBefore(wb);
+    if (_gerbangTutup) {
+      // belum jam booking → pantau tiap detik, begitu tepat waktu buka chat
+      _gerbangTicker = Timer.periodic(const Duration(seconds: 1), (_) {
+        final w = _waktuBooking;
+        if (w == null || !DateTime.now().isBefore(w)) {
+          _gerbangTicker?.cancel();
+          if (mounted) {
+            setState(() => _gerbangTutup = false);
+            _initChatMulai(); // baru sekarang sesi 30 menit dihitung
+          }
+        }
+      });
+    } else {
+      _initChatMulai();
+    }
   }
 
   Future<void> _initChatMulai() async {
@@ -213,6 +266,7 @@ class _ChatBookingPageState extends State<ChatBookingPage> {
 
   @override
   void dispose() {
+    _gerbangTicker?.cancel();
     _ticker?.cancel();
     _controller.dispose();
     super.dispose();
@@ -240,13 +294,19 @@ class _ChatBookingPageState extends State<ChatBookingPage> {
                     fontWeight: FontWeight.w800,
                     color: _Cb.textDark)),
             Text(
-              _sesiHabis
-                  ? 'Sesi 30 menit berakhir'
-                  : 'Sesi: $_formatSisa tersisa',
+              _gerbangTutup
+                  ? 'Chat dibuka saat jadwal booking'
+                  : _sesiHabis
+                      ? 'Sesi 30 menit berakhir'
+                      : 'Sesi: $_formatSisa tersisa',
               style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
-                  color: _sesiHabis ? _Cb.textFaint : _Cb.online),
+                  color: _gerbangTutup
+                      ? _Cb.textGrey
+                      : _sesiHabis
+                          ? _Cb.textFaint
+                          : _Cb.online),
             ),
           ],
         ),
@@ -259,45 +319,138 @@ class _ChatBookingPageState extends State<ChatBookingPage> {
             ),
         ],
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream: _pesanRef.orderBy('waktu', descending: true).limit(100).snapshots(),
-              builder: (context, snap) {
-                if (snap.hasError) {
-                  return const Center(child: Text('Gagal memuat pesan.'));
-                }
-                if (!snap.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                final docs = snap.data!.docs;
-                return ListView.builder(
-                  reverse: true,
-                  controller: _scroll,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  itemCount: docs.length,
-                  itemBuilder: (_, i) {
-                    final data = docs[i].data();
-                    final dariSaya = data['dari'] == _peranSaya;
-                    final tipe = (data['tipe'] ?? 'teks') as String;
-                    final teks = (data['teks'] ?? '') as String;
-                    final waktu = data['waktu'] is Timestamp
-                        ? (data['waktu'] as Timestamp).toDate()
-                        : DateTime.now();
-                    return _gelembungPesan(
-                      teks: teks,
-                      dariSaya: dariSaya,
-                      waktu: waktu,
-                      rekomendasi: tipe == 'rekomendasi',
-                    );
-                  },
-                );
-              },
+      body: _gerbangTutup
+          ? _gerbangTutupView()
+          : Column(
+              children: [
+                Expanded(
+                  child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                    stream: _pesanRef
+                        .orderBy('waktu', descending: true)
+                        .limit(100)
+                        .snapshots(),
+                    builder: (context, snap) {
+                      if (snap.hasError) {
+                        return const Center(child: Text('Gagal memuat pesan.'));
+                      }
+                      if (!snap.hasData) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      final docs = snap.data!.docs;
+                      return ListView.builder(
+                        reverse: true,
+                        controller: _scroll,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
+                        itemCount: docs.length,
+                        itemBuilder: (_, i) {
+                          final data = docs[i].data();
+                          final dariSaya = data['dari'] == _peranSaya;
+                          final tipe = (data['tipe'] ?? 'teks') as String;
+                          final teks = (data['teks'] ?? '') as String;
+                          final waktu = data['waktu'] is Timestamp
+                              ? (data['waktu'] as Timestamp).toDate()
+                              : DateTime.now();
+                          return _gelembungPesan(
+                            teks: teks,
+                            dariSaya: dariSaya,
+                            waktu: waktu,
+                            rekomendasi: tipe == 'rekomendasi',
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+                _barInput(),
+              ],
             ),
-          ),
-          _barInput(),
-        ],
+    );
+  }
+
+  // 🔒 [BARU] Layar terkunci: chat belum boleh dimulai sebelum jam booking
+  Widget _gerbangTutupView() {
+    final hari = (widget.booking['hari'] ?? '').toString();
+    final tanggal = (widget.booking['tanggal'] ?? '').toString();
+    final jam = (widget.booking['jam'] ?? '').toString();
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 84,
+              height: 84,
+              decoration: const BoxDecoration(
+                  color: Color(0xFFFDF3D7), shape: BoxShape.circle),
+              child: const Icon(Icons.lock_clock_rounded,
+                  size: 40, color: _Cb.accentDark),
+            ),
+            const SizedBox(height: 18),
+            const Text('Chat Belum Dibuka',
+                style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: _Cb.textDark)),
+            const SizedBox(height: 8),
+            Text(
+              'Sesi chat dengan $_namaLawan baru bisa dimulai\nsesuai jadwal booking ya 😊',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                  fontSize: 12.5, height: 1.5, color: _Cb.textGrey),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: _Cb.card,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: _Cb.divider),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.event_available_rounded,
+                          size: 16, color: _Cb.primary),
+                      const SizedBox(width: 6),
+                      Text('$hari, $tanggal',
+                          style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: _Cb.textDark)),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text('Pukul $jam',
+                      style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: _Cb.primary)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text('Terbuka dalam',
+                style: TextStyle(fontSize: 11.5, color: _Cb.textGrey)),
+            const SizedBox(height: 4),
+            Text(_hitungMundur,
+                style: const TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.2,
+                    color: _Cb.primary)),
+            const SizedBox(height: 14),
+            const Text(
+              'Halaman ini boleh dibuka duluan —\nchat otomatis aktif tepat pada jam booking ✨',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 11.5, height: 1.5, color: _Cb.textFaint),
+            ),
+          ],
+        ),
       ),
     );
   }
