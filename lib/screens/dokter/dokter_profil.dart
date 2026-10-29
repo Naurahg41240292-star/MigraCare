@@ -389,14 +389,11 @@ class _DokterProfilViewState extends State<DokterProfilView> {
                       Icons.info_outline_rounded,
                       'Tentang MigraCare',
                       'Versi aplikasi & kredit tim',
-                      () => _dialogSederhana(
-                        'Tentang MigraCare',
-                        'MigraCare v1.0.0\n\n'
-                            'Aplikasi skrining & pendampingan migrain '
-                            'berbasis AI (23 fitur, 7 kelas hasil). '
-                            'Dikembangkan sebagai proyek tugas kelompok.',
-                        Icons.info_outline_rounded,
-                      ),
+                      () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const _TentangMigraCarePage()),
+                        );
+                      },
                     ),
                     const SizedBox(height: 14),
                     _menu(
@@ -409,6 +406,89 @@ class _DokterProfilViewState extends State<DokterProfilView> {
                   ],
                 ),
               ),
+      ),
+    );
+  }
+}
+class _TentangMigraCarePage extends StatelessWidget {
+  const _TentangMigraCarePage();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: _Pf.bg,
+      appBar: AppBar(
+        backgroundColor: _Pf.bg,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: true,
+        title: const Text('Tentang MigraCare',
+            style: TextStyle(
+                color: _Pf.textDark,
+                fontWeight: FontWeight.w700,
+                fontSize: 17)),
+      ),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(28, 24, 28, 32),
+          children: [
+            const SizedBox(height: 24),
+            Center(
+              child: Image.asset(
+                'assets/images/logo.png',
+                width: 120,
+                height: 120,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => Container(
+                  width: 110,
+                  height: 110,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                        colors: [Color(0xFFF6C67B), _Pf.gold]),
+                    borderRadius: BorderRadius.circular(28),
+                  ),
+                  child: const Icon(Icons.psychology_rounded,
+                      size: 60, color: Colors.white),
+                ),
+              ),
+            ),
+            const SizedBox(height: 40),
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Text('Apa itu MigraCare?',
+                  style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.accentDark,)),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'MigraCare adalah platform kesehatan digital yang menggabungkan teknologi dan ilmu kesehatan untuk membantu pengguna menilai risiko migraine, mencatat frekuensi dan pemicu serangan, serta menyediakan informasi dan rekomendasi yang relevan.',
+              style: TextStyle(
+                  fontSize: 14, color: _Pf.textGrey, height: 1.8),
+            ),
+            const SizedBox(height: 30),
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Text('Kami Siap Membantu',
+                  style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.accentDark,)),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'Kami berkomitmen menjadi mitra yang dapat diandalkan dalam mengelola migraine dan menjaga kesehatan otak, baik bagi pengguna maupun para dokter pendamping.',
+              style: TextStyle(
+                  fontSize: 14, color: _Pf.textGrey, height: 1.8),
+            ),
+            const SizedBox(height: 70),
+            const Center(
+              child: Text('2024 MigraCare. All rights reserved.',
+                  style: TextStyle(fontSize: 12, color: _Pf.textGrey)),
+            ),
+          ],
+        ),
       ),
     );
   }
