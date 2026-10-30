@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/obat.dart';
 import '../services/notifikasi_service.dart'; // ← SESUAIKAN NAMA FILE
 import 'tambah_obat.dart';
@@ -24,6 +25,7 @@ class _PengingatObatPageState extends State<PengingatObatPage> {
   static const Color outline = Color(0xFFEDE3D4);
 
   bool pengingatAktif = true;
+  static const String _keyPengingatAktif = 'pengingat_aktif';
 
   @override
   void initState() {
@@ -32,20 +34,32 @@ class _PengingatObatPageState extends State<PengingatObatPage> {
   }
 
   Future<void> _muat() async {
+    // 1. Load state toggle dari SharedPreferences
+    final prefs = await SharedPreferences.getInstance();
+    pengingatAktif = prefs.getBool(_keyPengingatAktif) ?? true;
+
+    // 2. Load data obat
     await PengingatStore.instance.muatDariDisk();
     PengingatStore.instance.sinkronkanRiwayatHariIni();
 
-    // ===== TAMBAHAN: reschedule semua saat app buka =====
+    // 3. Reschedule HANYA kalau toggle ON
     if (pengingatAktif) {
       await NotificationService.instance.rescheduleSemua();
+    } else {
+      // Kalau OFF, pastikan semua notif di-cancel
+      await NotificationService.instance.batalkanSemua();
     }
 
     if (mounted) setState(() {});
   }
 
   // ===== HANDLER SWITCH =====
-  Future<void> _togglePengingat(bool value) async {
+    Future<void> _togglePengingat(bool value) async {
     setState(() => pengingatAktif = value);
+
+    // ===== TAMBAHAN: save state ke SharedPreferences =====
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyPengingatAktif, value);
 
     if (value) {
       await NotificationService.instance.rescheduleSemua();

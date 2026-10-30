@@ -22,9 +22,21 @@ class _DetailDokterScreenState extends State<DetailDokterScreen> {
   String? _slotTerpilih;
   bool _sedangBooking = false;
 
+  // ⏸️ [REVISI] Jam istirahat dokter — slot di rentang ini TIDAK muncul
+  // di pilihan booking. Format: [jamMulai, jamSelesai] dalam menit.
+  // Mau ubah/tambah istirahat? Edit daftar di bawah ini aja.
+  static const List<List<int>> _jamIstirahat = [
+    [11 * 60, 13 * 60],            // 11:00 - 13:00 (istirahat siang)
+    [17 * 60 + 30, 18 * 60 + 30],  // 17:30 - 18:30 (istirahat sore)
+  ];
+
   // jadwal REAL dokter dari Firestore
   List<Map<String, dynamic>> _jadwal = [];
   bool _loadingJadwal = true;
+
+  // ✅ [BARU] Slot yang SUDAH dibooking pasien lain
+  // format kunci: 'tanggal|jam' contoh '30/10/2026|09:00'
+  Set<String> _jamTerpakai = {};
 
   // ✅ BARU: tanggal terdekat (14 hari ke depan) yang hari-nya punya jadwal
   late final List<DateTime> _semuaHariDepan =
@@ -39,6 +51,7 @@ class _DetailDokterScreenState extends State<DetailDokterScreen> {
   }
 
   /// Baca jadwal dokter dari users/{uidDokter}/jadwal
+  /// + booking yang sudah ada (biar slot yang terisi tidak bisa dobel)
   Future<void> _muatJadwal() async {
     try {
       final snap = await FirebaseFirestore.instance
@@ -46,6 +59,23 @@ class _DetailDokterScreenState extends State<DetailDokterScreen> {
           .doc(widget.dokter.id)
           .collection('jadwal')
           .get();
+
+      // ✅ [BARU] ambil semua booking dokter ini yang masih aktif
+      final snapB = await FirebaseFirestore.instance
+          .collection('booking')
+          .where('dokterUid', isEqualTo: widget.dokter.id)
+          .get();
+      final terpakai = <String>{};
+      for (final d in snapB.docs) {
+        final b = d.data();
+        final status = (b['status'] ?? '').toString();
+        // status 'ditolak' → slot bebas lagi, jadi tidak dihitung
+        if (status == 'menunggu' || status == 'dikonfirmasi') {
+          final tgl = (b['tanggal'] ?? '').toString().trim();
+          final jam = (b['jam'] ?? '').toString().trim();
+          if (tgl.isNotEmpty && jam.isNotEmpty) terpakai.add('$tgl|$jam');
+        }
+      }
 
       if (!mounted) return;
       setState(() {
@@ -57,6 +87,7 @@ class _DetailDokterScreenState extends State<DetailDokterScreen> {
             'jamSelesai': data['jamSelesai'] ?? '',
           };
         }).toList();
+        _jamTerpakai = terpakai;
 
         // ✅ BARU: hitung tanggal terdekat yang hari-nya cocok dengan jadwal
         final hariAda = _jadwal.map((j) => j['hari'] as String).toSet();
@@ -81,11 +112,17 @@ class _DetailDokterScreenState extends State<DetailDokterScreen> {
     return (int.tryParse(p[0]) ?? 0) * 60 + (int.tryParse(p[1]) ?? 0);
   }
 
+  /// Apakah menit ke-t masuk jam istirahat?
+  bool _sedangIstirahat(int t) =>
+      _jamIstirahat.any((r) => t >= r[0] && t < r[1]);
+
   List<String> _hitungSlot(String mulai, String selesai) {
     final a = _jamKeMenit(mulai);
     final b = _jamKeMenit(selesai);
     final slots = <String>[];
     for (var t = a; t + 30 <= b; t += 30) {
+      // ⏸️ [REVISI] lewati slot yang masuk jam istirahat
+      if (_sedangIstirahat(t)) continue;
       slots.add('${(t ~/ 60).toString().padLeft(2, '0')}:${(t % 60).toString().padLeft(2, '0')}');
     }
     return slots;
@@ -99,12 +136,25 @@ class _DetailDokterScreenState extends State<DetailDokterScreen> {
   List<Map<String, dynamic>> get _jadwalHariIni =>
       _jadwal.where((j) => j['hari'] == _namaHariPilihan).toList();
 
+  // ✅ [BARU] kunci tanggal terpilih, format sama kaya yang disimpan di booking
+  String get _kunciTanggalPilihan =>
+      _tanggalPilihan == null
+          ? ''
+          : '${_tanggalPilihan!.day}/${_tanggalPilihan!.month}/${_tanggalPilihan!.year}';
+
+  // ✅ [BARU] apakah slot jam ini sudah dibooking pasien lain?
+  bool _sudahDibooking(String slot) =>
+      _jamTerpakai.contains('$_kunciTanggalPilihan|$slot');
+
   List<String> get _slotsHariIni {
-    final all = <String>[];
+    final all = <String>{};
     for (final j in _jadwalHariIni) {
       all.addAll(_hitungSlot(j['jamMulai'], j['jamSelesai']));
     }
-    return all;
+    // ✅ [BARU] buang slot yang sudah dibooking pasien lain
+    all.removeWhere(_sudahDibooking);
+    final list = all.toList()..sort();
+    return list;
   }
 
   // ================= BOOKING (revisi #1) =================
@@ -260,9 +310,10 @@ class _DetailDokterScreenState extends State<DetailDokterScreen> {
                                   const SizedBox(width: 10),
                                   Expanded(
                                     child: Text(
-                                      'Tersedia setiap: ${_jamRingkas()}',
+                                      'Tersedia setiap: ${_jamRingkas()}\n⏸️ Istirahat 11.00 - 13.00 & 17.30 - 18.30 (slot jam itu tidak muncul)',
                                       style: const TextStyle(
                                           fontSize: 12.5,
+                                          height: 1.5,
                                           color: AppColors.textDark),
                                     ),
                                   ),
@@ -318,6 +369,21 @@ class _DetailDokterScreenState extends State<DetailDokterScreen> {
                                       : 'Terpilih: $_namaHariPilihan, $_slotTerpilih (30 menit)',
                                   style: const TextStyle(
                                       fontSize: 12.5, color: AppColors.textSoft),
+                                ),
+                              ] else ...[
+                                // ✅ [BARU] semua slot di tanggal ini sudah dibooking
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(14),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.card,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: AppColors.divider),
+                                  ),
+                                  child: const Text(
+                                    'Semua jam pada tanggal ini sudah dibooking 🙏\nCoba pilih tanggal lain ya!',
+                                    style: TextStyle(fontSize: 12.5, color: AppColors.textSoft),
+                                  ),
                                 ),
                               ],
                             ],
