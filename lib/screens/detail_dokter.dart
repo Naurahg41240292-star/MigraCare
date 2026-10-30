@@ -38,7 +38,7 @@ class _DetailDokterScreenState extends State<DetailDokterScreen> {
   // format kunci: 'tanggal|jam' contoh '30/10/2026|09:00'
   Set<String> _jamTerpakai = {};
 
-  // ✅ BARU: tanggal terdekat (14 hari ke depan) yang hari-nya punya jadwal
+  // ✅ tanggal terdekat (14 hari ke depan) yang hari-nya punya jadwal
   late final List<DateTime> _semuaHariDepan =
       List.generate(14, (i) => DateTime.now().add(Duration(days: i)));
   List<DateTime> _tanggalTersedia = [];
@@ -50,22 +50,41 @@ class _DetailDokterScreenState extends State<DetailDokterScreen> {
     _muatJadwal();
   }
 
-  /// Baca jadwal dokter dari users/{uidDokter}/jadwal
-  /// + booking yang sudah ada (biar slot yang terisi tidak bisa dobel)
+  /// Muat jadwal dokter + slot yang sudah terbooking.
+  /// [PENTING] jadwal dan booking dipisah try-catch sendiri-sendiri,
+  /// supaya kalau query booking gagal (mis. security rules),
+  /// jadwal dokter TETAP MUNCUL.
   Future<void> _muatJadwal() async {
+    List<Map<String, dynamic>> jadwal = [];
+
+    // ---------- 1) JADWAL DOKTER ----------
     try {
       final snap = await FirebaseFirestore.instance
           .collection('users')
           .doc(widget.dokter.id)
           .collection('jadwal')
           .get();
+      jadwal = snap.docs.map((d) {
+        final data = d.data();
+        return {
+          'hari': data['hari'] ?? '',
+          'jamMulai': data['jamMulai'] ?? '',
+          'jamSelesai': data['jamSelesai'] ?? '',
+        };
+      }).toList();
+    } catch (_) {
+      // jadwal gagal dimuat → biarkan kosong, tampil pesan "belum atur jadwal"
+    }
 
-      // ✅ [BARU] ambil semua booking dokter ini yang masih aktif
+    // ---------- 2) SLOT YANG SUDAH TERBOOKING ----------
+    // kalau query ini gagal (rules), anti-dobel belum aktif —
+    // tapi jadwal tetap tampil normal.
+    final terpakai = <String>{};
+    try {
       final snapB = await FirebaseFirestore.instance
           .collection('booking')
           .where('dokterUid', isEqualTo: widget.dokter.id)
           .get();
-      final terpakai = <String>{};
       for (final d in snapB.docs) {
         final b = d.data();
         final status = (b['status'] ?? '').toString();
@@ -76,36 +95,28 @@ class _DetailDokterScreenState extends State<DetailDokterScreen> {
           if (tgl.isNotEmpty && jam.isNotEmpty) terpakai.add('$tgl|$jam');
         }
       }
-
-      if (!mounted) return;
-      setState(() {
-        _jadwal = snap.docs.map((d) {
-          final data = d.data();
-          return {
-            'hari': data['hari'] ?? '',
-            'jamMulai': data['jamMulai'] ?? '',
-            'jamSelesai': data['jamSelesai'] ?? '',
-          };
-        }).toList();
-        _jamTerpakai = terpakai;
-
-        // ✅ BARU: hitung tanggal terdekat yang hari-nya cocok dengan jadwal
-        final hariAda = _jadwal.map((j) => j['hari'] as String).toSet();
-        _tanggalTersedia = _semuaHariDepan
-            .where((d) => hariAda.contains(Tanggal.namaHari[d.weekday - 1]))
-            .toList();
-        _tanggalPilihan =
-            _tanggalTersedia.isNotEmpty ? _tanggalTersedia.first : null;
-
-        _loadingJadwal = false;
-      });
     } catch (_) {
-      if (!mounted) return;
-      setState(() => _loadingJadwal = false);
+      // diam saja — slot tetap tampil semua
     }
+
+    if (!mounted) return;
+    setState(() {
+      _jadwal = jadwal;
+      _jamTerpakai = terpakai;
+
+      // hitung tanggal terdekat yang hari-nya cocok dengan jadwal
+      final hariAda = jadwal.map((j) => j['hari'] as String).toSet();
+      _tanggalTersedia = _semuaHariDepan
+          .where((d) => hariAda.contains(Tanggal.namaHari[d.weekday - 1]))
+          .toList();
+      _tanggalPilihan =
+          _tanggalTersedia.isNotEmpty ? _tanggalTersedia.first : null;
+
+      _loadingJadwal = false;
+    });
   }
 
-  // ================= LOGIKA SLOT 30 MENIT (revisi #2) =================
+  // ================= LOGIKA SLOT 30 MENIT =================
   int _jamKeMenit(String hhmm) {
     final p = hhmm.split(':');
     if (p.length != 2) return 0;
@@ -136,13 +147,13 @@ class _DetailDokterScreenState extends State<DetailDokterScreen> {
   List<Map<String, dynamic>> get _jadwalHariIni =>
       _jadwal.where((j) => j['hari'] == _namaHariPilihan).toList();
 
-  // ✅ [BARU] kunci tanggal terpilih, format sama kaya yang disimpan di booking
+  // ✅ kunci tanggal terpilih, format sama kaya yang disimpan di booking
   String get _kunciTanggalPilihan =>
       _tanggalPilihan == null
           ? ''
           : '${_tanggalPilihan!.day}/${_tanggalPilihan!.month}/${_tanggalPilihan!.year}';
 
-  // ✅ [BARU] apakah slot jam ini sudah dibooking pasien lain?
+  // ✅ apakah slot jam ini sudah dibooking pasien lain?
   bool _sudahDibooking(String slot) =>
       _jamTerpakai.contains('$_kunciTanggalPilihan|$slot');
 
@@ -157,7 +168,7 @@ class _DetailDokterScreenState extends State<DetailDokterScreen> {
     return list;
   }
 
-  // ================= BOOKING (revisi #1) =================
+  // ================= BOOKING =================
   Future<void> _booking() async {
     if (_slotTerpilih == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -371,7 +382,7 @@ class _DetailDokterScreenState extends State<DetailDokterScreen> {
                                       fontSize: 12.5, color: AppColors.textSoft),
                                 ),
                               ] else ...[
-                                // ✅ [BARU] semua slot di tanggal ini sudah dibooking
+                                // ✅ semua slot di tanggal ini sudah dibooking
                                 Container(
                                   width: double.infinity,
                                   padding: const EdgeInsets.all(14),
@@ -420,7 +431,7 @@ class _DetailDokterScreenState extends State<DetailDokterScreen> {
     return _jadwal.map((j) => '${j['hari']} ${j['jamMulai']}-${j['jamSelesai']}').join(', ');
   }
 
-  // ---- ✅ chip hari: hanya tanggal yang PUNYA jadwal (dari 14 hari ke depan) ----
+  // ---- chip hari: hanya tanggal yang PUNYA jadwal (dari 14 hari ke depan) ----
   Widget _chipHari() {
     return ListView.separated(
       scrollDirection: Axis.horizontal,
