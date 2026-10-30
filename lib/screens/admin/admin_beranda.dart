@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'admin_laporan.dart';
 import 'admin_artikel.dart';
 import 'admin_layanan.dart';
+import 'admin_notifikasi.dart';
 import 'admin_tambah_dokter.dart';
 import '../../models/artikel.dart';
 import '../../services/notifikasi_service.dart';
@@ -265,28 +266,36 @@ class _AdminBerandaPageState extends State<AdminBerandaPage> {
                 Image.asset('assets/images/logo_atas.png',
                     height: 34, fit: BoxFit.contain),
                 const Spacer(),
-                ValueListenableBuilder<int>(
-                  valueListenable: NotifikasiService.penggunaBaru,
-                  builder: (context, jumlah, _) => Stack(
-                    children: [
-                      const Icon(Icons.notifications_none_rounded,
-                          color: _Ab.textDark, size: 26),
-                      if (jumlah > 0)
-                        Positioned(
-                          right: 0,
-                          top: 0,
-                          child: Container(
-                            padding: const EdgeInsets.all(3),
-                            decoration: const BoxDecoration(
-                                color: Colors.redAccent, shape: BoxShape.circle),
-                            child: Text('$jumlah',
-                                style: const TextStyle(
-                                    fontSize: 8,
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold)),
+                GestureDetector(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const AdminNotifikasiPage()),
+                  ),
+                  child: ValueListenableBuilder<int>(
+                    valueListenable: NotifikasiService.penggunaBaru,
+                    builder: (context, jumlah, _) => Stack(
+                      children: [
+                        const Icon(Icons.notifications_none_rounded,
+                            color: _Ab.textDark, size: 26),
+                        if (jumlah > 0)
+                          Positioned(
+                            right: 0,
+                            top: 0,
+                            child: Container(
+                              padding: const EdgeInsets.all(3),
+                              decoration: const BoxDecoration(
+                                  color: Colors.redAccent,
+                                  shape: BoxShape.circle),
+                              child: Text('$jumlah',
+                                  style: const TextStyle(
+                                      fontSize: 8,
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold)),
+                            ),
                           ),
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -405,10 +414,10 @@ class _AdminBerandaPageState extends State<AdminBerandaPage> {
             // ---------- 3 STAT KECIL (semua bisa ditekan) ----------
             Row(
               children: [
-                _statKecil('Artikel', '${artikelPopuler.length}',
+                _statKecil('Artikel', '0',
                     onTap: () => setState(() => _index = 2)),
                 const SizedBox(width: 12),
-                _statKecil('Layanan', '${daftarLayanan.length}',
+                _statKecil('Layanan', '0',
                     onTap: () => setState(() => _index = 3)),
                 const SizedBox(width: 12),
                 _statKecil('Dokter', '$_totalDokter',

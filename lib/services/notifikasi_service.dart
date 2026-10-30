@@ -22,6 +22,10 @@ class NotifikasiService {
   NotifikasiService._();
 
   static final ValueNotifier<int> penggunaBaru = ValueNotifier<int>(0);
+
+  /// Daftar isi notifikasi (paling baru di atas) untuk halaman notifikasi
+  static final ValueNotifier<List<Map<String, String>>> daftarNotifikasi =
+      ValueNotifier<List<Map<String, String>>>([]);
   static StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _sub;
   static bool _sudahInit = false;
   static bool _snapshotPertama = false;
@@ -41,6 +45,24 @@ class NotifikasiService {
         for (final change in snap.docChanges) {
           if (change.type == DocumentChangeType.added) {
             penggunaBaru.value++;
+
+            // simpan detail notifikasi agar bisa ditampilkan di halaman
+            final data = change.doc.data();
+            final nama = (data?['profile']?['namaLengkap'] ??
+                    data?['akun']?['namaLengkap'] ??
+                    'Pengguna baru')
+                .toString();
+            final role = (data?['role'] ?? 'pasien').toString();
+            daftarNotifikasi.value = [
+              {
+                'judul': role == 'dokter'
+                    ? 'Dokter baru terdaftar'
+                    : 'Pengguna baru mendaftar',
+                'isi': nama,
+                'waktu': DateTime.now().toIso8601String(),
+              },
+              ...daftarNotifikasi.value,
+            ];
           }
         }
       },
@@ -59,6 +81,11 @@ class NotifikasiService {
     } catch (e) {
       debugPrint('FCM dilewati: $e');
     }
+  }
+
+  /// Dipanggil saat halaman notifikasi dibuka -> badge lonceng kembali 0
+  static void tandaiSudahDibaca() {
+    penggunaBaru.value = 0;
   }
 }
 
