@@ -5,11 +5,13 @@ import 'dokter_detail_pasien.dart';
 
 /// ==========================================================================
 ///  MIGRACARE — Chat Pasien ↔ Dokter (berbasis Booking, realtime Firestore)
-///  - Timer 30 menit (revisi #2): dimulai saat chat pertama dibuka
+///  - Timer sesi: dimulai saat chat pertama dibuka / tepat jam booking
+///  - ✅ [REVISI DOSEN] Durasi sesi ikut pilihan dokter saat atur jadwal
+///    (15 / 30 / 60 menit) — dibaca dari booking.durasiMenit
 ///  - Dokter bisa kirim pesan REKOMENDASI (tampil khusus)
 ///  - Titik tiga kanan atas -> Detail Pasien (khusus dokter)
-///  - [BARU] Gerbang jadwal: chat terkunci sampai TEPAT jam booking.
-///    Sesi 30 menit baru dihitung mulai jam booking, bukan saat halaman
+///  - Gerbang jadwal: chat terkunci sampai TEPAT jam booking.
+///    Sesi baru dihitung mulai jam booking, bukan saat halaman
 ///    dibuka lebih awal.
 ///  File: lib/screens/dokter/chat_booking.dart
 ///  ✅ Mandiri: warna internal (_Cb) — tidak bergantung theme.dart
@@ -57,12 +59,15 @@ class _ChatBookingPageState extends State<ChatBookingPage> {
   final _controller = TextEditingController();
   final _scroll = ScrollController();
 
-  static const int durasiMenit = 30;
+  // ✅ [REVISI DOSEN] durasi sesi ikut pilihan dokter saat booking
+  // (booking lama yang tidak punya field ini → default 30 menit)
+  int get durasiMenit =>
+      (widget.booking['durasiMenit'] as num?)?.toInt() ?? 30;
 
   Timer? _ticker;
   int _sisaDetik = -1;
 
-  // 🔒 [BARU] Gerbang jadwal: true = belum jam booking, chat terkunci
+  // 🔒 Gerbang jadwal: true = belum jam booking, chat terkunci
   bool _gerbangTutup = false;
   Timer? _gerbangTicker;
 
@@ -80,7 +85,7 @@ class _ChatBookingPageState extends State<ChatBookingPage> {
       : (widget.booking['dokterNama'] ?? 'Dokter');
   String get _peranSaya => widget.sayaDokter ? 'dokter' : 'pasien';
 
-  // 🔒 [BARU] Waktu booking lengkap dari data booking (tanggal + jam)
+  // 🔒 Waktu booking lengkap dari data booking (tanggal + jam)
   // format tanggal: 'd/m/yyyy' — format jam: 'HH:mm'
   DateTime? get _waktuBooking {
     final tanggal = (widget.booking['tanggal'] ?? '').toString();
@@ -112,7 +117,7 @@ class _ChatBookingPageState extends State<ChatBookingPage> {
   @override
   void initState() {
     super.initState();
-    // 🔒 [BARU] Cek gerbang jadwal sebelum apa-apa
+    // 🔒 Cek gerbang jadwal sebelum apa-apa
     final wb = _waktuBooking;
     _gerbangTutup = wb != null && DateTime.now().isBefore(wb);
     if (_gerbangTutup) {
@@ -123,7 +128,7 @@ class _ChatBookingPageState extends State<ChatBookingPage> {
           _gerbangTicker?.cancel();
           if (mounted) {
             setState(() => _gerbangTutup = false);
-            _initChatMulai(); // baru sekarang sesi 30 menit dihitung
+            _initChatMulai(); // baru sekarang sesi dihitung
           }
         }
       });
@@ -149,7 +154,9 @@ class _ChatBookingPageState extends State<ChatBookingPage> {
         final doc = await _bookingRef.get();
         final mulai = doc.data()?['chatDimulaiPada'];
         if (mulai is! Timestamp || !mounted) return;
-        final habis = mulai.toDate().add(const Duration(minutes: durasiMenit));
+        // ✅ [REVISI DOSEN] habisnya sesi ikut durasi booking
+        final habis =
+            mulai.toDate().add(Duration(minutes: durasiMenit));
         final sisa = habis.difference(DateTime.now()).inSeconds;
         setState(() => _sisaDetik = sisa < 0 ? 0 : sisa);
       } catch (_) {}
@@ -297,7 +304,7 @@ class _ChatBookingPageState extends State<ChatBookingPage> {
               _gerbangTutup
                   ? 'Chat dibuka saat jadwal booking'
                   : _sesiHabis
-                      ? 'Sesi 30 menit berakhir'
+                      ? 'Sesi $durasiMenit menit berakhir'
                       : 'Sesi: $_formatSisa tersisa',
               style: TextStyle(
                   fontSize: 11,
@@ -368,7 +375,7 @@ class _ChatBookingPageState extends State<ChatBookingPage> {
     );
   }
 
-  // 🔒 [BARU] Layar terkunci: chat belum boleh dimulai sebelum jam booking
+  // 🔒 Layar terkunci: chat belum boleh dimulai sebelum jam booking
   Widget _gerbangTutupView() {
     final hari = (widget.booking['hari'] ?? '').toString();
     final tanggal = (widget.booking['tanggal'] ?? '').toString();
@@ -425,7 +432,8 @@ class _ChatBookingPageState extends State<ChatBookingPage> {
                     ],
                   ),
                   const SizedBox(height: 4),
-                  Text('Pukul $jam',
+                  // ✅ [REVISI DOSEN] tampilin durasi sesi juga
+                  Text('Pukul $jam • $durasiMenit menit',
                       style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
@@ -589,7 +597,7 @@ class _ChatBookingPageState extends State<ChatBookingPage> {
                     border: InputBorder.none,
                     isDense: true,
                     hintText: mati
-                        ? 'Sesi 30 menit telah berakhir'
+                        ? 'Sesi $durasiMenit menit telah berakhir'
                         : 'Ketik pesan...',
                     hintStyle:
                         const TextStyle(fontSize: 13.5, color: _Cb.textFaint),

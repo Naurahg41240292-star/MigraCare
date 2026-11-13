@@ -22,7 +22,7 @@ class _DetailDokterScreenState extends State<DetailDokterScreen> {
   String? _slotTerpilih;
   bool _sedangBooking = false;
 
-  // ⏸️ [REVISI] Jam istirahat dokter — slot di rentang ini TIDAK muncul
+  // ⏸️ Jam istirahat dokter — slot di rentang ini TIDAK muncul
   // di pilihan booking. Format: [jamMulai, jamSelesai] dalam menit.
   // Mau ubah/tambah istirahat? Edit daftar di bawah ini aja.
   static const List<List<int>> _jamIstirahat = [
@@ -34,11 +34,11 @@ class _DetailDokterScreenState extends State<DetailDokterScreen> {
   List<Map<String, dynamic>> _jadwal = [];
   bool _loadingJadwal = true;
 
-  // ✅ [BARU] Slot yang SUDAH dibooking pasien lain
+  // Slot yang SUDAH dibooking pasien lain
   // format kunci: 'tanggal|jam' contoh '30/10/2026|09:00'
   Set<String> _jamTerpakai = {};
 
-  // ✅ tanggal terdekat (14 hari ke depan) yang hari-nya punya jadwal
+  // tanggal terdekat (14 hari ke depan) yang hari-nya punya jadwal
   late final List<DateTime> _semuaHariDepan =
       List.generate(14, (i) => DateTime.now().add(Duration(days: i)));
   List<DateTime> _tanggalTersedia = [];
@@ -70,6 +70,8 @@ class _DetailDokterScreenState extends State<DetailDokterScreen> {
           'hari': data['hari'] ?? '',
           'jamMulai': data['jamMulai'] ?? '',
           'jamSelesai': data['jamSelesai'] ?? '',
+          // ✅ [REVISI DOSEN] durasi per konsultasi ikut pengaturan dokter
+          'durasiMenit': (data['durasiMenit'] as num?)?.toInt() ?? 30,
         };
       }).toList();
     } catch (_) {
@@ -116,24 +118,30 @@ class _DetailDokterScreenState extends State<DetailDokterScreen> {
     });
   }
 
-  // ================= LOGIKA SLOT 30 MENIT =================
+  // ========= LOGIKA SLOT (durasi ikut pengaturan dokter) =========
   int _jamKeMenit(String hhmm) {
     final p = hhmm.split(':');
     if (p.length != 2) return 0;
     return (int.tryParse(p[0]) ?? 0) * 60 + (int.tryParse(p[1]) ?? 0);
   }
 
-  /// Apakah menit ke-t masuk jam istirahat?
-  bool _sedangIstirahat(int t) =>
-      _jamIstirahat.any((r) => t >= r[0] && t < r[1]);
+  /// ⏸️ [REVISI] apakah sesi [mulaiMenit, mulaiMenit+durasi) beririsan
+  /// dengan jam istirahat? (dicek sampai ujungnya, jadi sesi 60 menit
+  /// yang "nembus" jam istirahat juga di-skip)
+  bool _bentrokIstirahat(int mulaiMenit, int durasiMenit) =>
+      _jamIstirahat.any((r) =>
+          mulaiMenit < r[1] && mulaiMenit + durasiMenit > r[0]);
 
-  List<String> _hitungSlot(String mulai, String selesai) {
+  int _durasiDari(Map<String, dynamic> j) =>
+      (j['durasiMenit'] as num?)?.toInt() ?? 30;
+
+  List<String> _hitungSlot(String mulai, String selesai, int durasi) {
     final a = _jamKeMenit(mulai);
     final b = _jamKeMenit(selesai);
     final slots = <String>[];
-    for (var t = a; t + 30 <= b; t += 30) {
-      // ⏸️ [REVISI] lewati slot yang masuk jam istirahat
-      if (_sedangIstirahat(t)) continue;
+    for (var t = a; t + durasi <= b; t += durasi) {
+      // ⏸️ lewati sesi yang masuk/beririsan jam istirahat
+      if (_bentrokIstirahat(t, durasi)) continue;
       slots.add('${(t ~/ 60).toString().padLeft(2, '0')}:${(t % 60).toString().padLeft(2, '0')}');
     }
     return slots;
@@ -147,26 +155,48 @@ class _DetailDokterScreenState extends State<DetailDokterScreen> {
   List<Map<String, dynamic>> get _jadwalHariIni =>
       _jadwal.where((j) => j['hari'] == _namaHariPilihan).toList();
 
-  // ✅ kunci tanggal terpilih, format sama kaya yang disimpan di booking
+  // kunci tanggal terpilih, format sama kaya yang disimpan di booking
   String get _kunciTanggalPilihan =>
       _tanggalPilihan == null
           ? ''
           : '${_tanggalPilihan!.day}/${_tanggalPilihan!.month}/${_tanggalPilihan!.year}';
 
-  // ✅ apakah slot jam ini sudah dibooking pasien lain?
+  // apakah slot jam ini sudah dibooking pasien lain?
   bool _sudahDibooking(String slot) =>
       _jamTerpakai.contains('$_kunciTanggalPilihan|$slot');
 
-  List<String> get _slotsHariIni {
-    final all = <String>{};
+  // ✅ [REVISI DOSEN] slot hari ini + durasinya (slot '08:15' → 15 menit)
+  Map<String, int> get _slotDurasiHariIni {
+    final map = <String, int>{};
     for (final j in _jadwalHariIni) {
-      all.addAll(_hitungSlot(j['jamMulai'], j['jamSelesai']));
+      final d = _durasiDari(j);
+      for (final s in _hitungSlot(j['jamMulai'], j['jamSelesai'], d)) {
+        map.putIfAbsent(s, () => d);
+      }
     }
-    // ✅ [BARU] buang slot yang sudah dibooking pasien lain
-    all.removeWhere(_sudahDibooking);
-    final list = all.toList()..sort();
-    return list;
+    // buang slot yang sudah dibooking pasien lain
+    map.removeWhere((s, _) => _sudahDibooking(s));
+    return map;
   }
+
+  List<String> get _slotsHariIni =>
+      _slotDurasiHariIni.keys.toList()..sort();
+
+  // durasi slot yang sedang dipilih (buat disimpan di booking)
+  int get _durasiSlotTerpilih {
+    if (_slotTerpilih == null) return 30;
+    return _slotDurasiHariIni[_slotTerpilih!] ?? 30;
+  }
+
+  /// label durasi rapi: "30 menit" / "15–60 menit" kalau campuran
+  String _labelDurasi(Iterable<int> durs) {
+    final unik = durs.toSet().toList()..sort();
+    if (unik.isEmpty) return '30 menit';
+    if (unik.length == 1) return '${unik.first} menit';
+    return '${unik.first}–${unik.last} menit';
+  }
+
+  String get _labelDurasiDokter => _labelDurasi(_jadwal.map(_durasiDari));
 
   // ================= BOOKING =================
   Future<void> _booking() async {
@@ -199,7 +229,8 @@ class _DetailDokterScreenState extends State<DetailDokterScreen> {
         'hari': _namaHariPilihan,
         'tanggal': '${_tanggalPilihan!.day}/${_tanggalPilihan!.month}/${_tanggalPilihan!.year}',
         'jam': _slotTerpilih,
-        'durasiMenit': 30,
+        // ✅ [REVISI DOSEN] durasi ikut pilihan dokter di slot ini
+        'durasiMenit': _durasiSlotTerpilih,
         'status': 'menunggu',
         'dibuatPada': FieldValue.serverTimestamp(),
       });
@@ -305,7 +336,7 @@ class _DetailDokterScreenState extends State<DetailDokterScreen> {
                               ),
                             )
                           else ...[
-                            // ✅ INFO: jadwal mingguan dokter (biar pasien tahu hari apa tersedia)
+                            // INFO: jadwal mingguan dokter (biar pasien tahu hari apa tersedia)
                             Container(
                               width: double.infinity,
                               padding: const EdgeInsets.all(14),
@@ -321,7 +352,7 @@ class _DetailDokterScreenState extends State<DetailDokterScreen> {
                                   const SizedBox(width: 10),
                                   Expanded(
                                     child: Text(
-                                      'Tersedia setiap: ${_jamRingkas()}\n⏸️ Istirahat 11.00 - 13.00 & 17.30 - 18.30 (slot jam itu tidak muncul)',
+                                      'Tersedia setiap: ${_jamRingkas()}\n⏸️ Istirahat 11.00 - 13.00 & 17.30 - 18.30 (slot jam itu tidak muncul)\n⏱️ Durasi per sesi: ${_labelDurasiDokter} (mengikuti pengaturan dokter)',
                                       style: const TextStyle(
                                           fontSize: 12.5,
                                           height: 1.5,
@@ -342,7 +373,7 @@ class _DetailDokterScreenState extends State<DetailDokterScreen> {
                               SizedBox(height: 62, child: _chipHari()),
                               const SizedBox(height: 14),
                               if (_slotsHariIni.isNotEmpty) ...[
-                                const Text('Pilih Jam (30 menit / sesi)',
+                                Text('Pilih Jam (${_labelDurasi(_slotDurasiHariIni.values)} / sesi)',
                                     style: TextStyle(
                                         fontSize: 13, fontWeight: FontWeight.w700,
                                         color: AppColors.textDark)),
@@ -377,12 +408,12 @@ class _DetailDokterScreenState extends State<DetailDokterScreen> {
                                 Text(
                                   _slotTerpilih == null
                                       ? 'Pilih jam di atas untuk booking konsultasi'
-                                      : 'Terpilih: $_namaHariPilihan, $_slotTerpilih (30 menit)',
+                                      : 'Terpilih: $_namaHariPilihan, $_slotTerpilih (${_durasiSlotTerpilih} menit)',
                                   style: const TextStyle(
                                       fontSize: 12.5, color: AppColors.textSoft),
                                 ),
                               ] else ...[
-                                // ✅ semua slot di tanggal ini sudah dibooking
+                                // semua slot di tanggal ini sudah dibooking
                                 Container(
                                   width: double.infinity,
                                   padding: const EdgeInsets.all(14),
@@ -408,7 +439,7 @@ class _DetailDokterScreenState extends State<DetailDokterScreen> {
                             const SizedBox(width: 12),
                             Expanded(child: _KartuInfo(
                                 icon: Icons.chat_rounded,
-                                label: 'SESI', value: '30 menit')),
+                                label: 'SESI', value: _labelDurasiDokter)),
                           ]),
                           const SizedBox(height: 22),
                           _tombolBooking(dokter),

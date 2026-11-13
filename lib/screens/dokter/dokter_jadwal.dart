@@ -10,7 +10,7 @@ abstract class _Jd {
   static const Color outline = Color(0xFFE5DCCB);
 }
 
-/// TAB Jadwal — CRUD jadwal dokter (revisi #8)
+/// TAB Jadwal — CRUD jadwal dokter + durasi konsultasi pilihan (revisi dosen)
 class DokterJadwalView extends StatefulWidget {
   const DokterJadwalView({super.key});
 
@@ -25,7 +25,9 @@ class _DokterJadwalViewState extends State<DokterJadwalView> {
   static const List<String> _hariList = [
     'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu',
   ];
-  static const int durasiMenit = 30;
+
+  /// ✅ [REVISI DOSEN] durasi per konsultasi bisa dipilih dokter
+  static const List<int> _durasiPilihan = [15, 30, 60];
 
   @override
   void initState() {
@@ -71,16 +73,18 @@ class _DokterJadwalViewState extends State<DokterJadwalView> {
     return '$h:$mm';
   }
 
-  List<String> hitungSlot(String mulai, String selesai) {
+  List<String> hitungSlot(String mulai, String selesai, [int durasi = 30]) {
     final a = _jamKeMenit(mulai);
     final b = _jamKeMenit(selesai);
-    return [
-      for (var t = a; t + durasiMenit <= b; t += durasiMenit) _menitKeJam(t)
-    ];
+    return [for (var t = a; t + durasi <= b; t += durasi) _menitKeJam(t)];
   }
+
+  int _durasiDari(Map<String, dynamic>? data) =>
+      (data?['durasiMenit'] as num?)?.toInt() ?? 30;
 
   Future<void> _formJadwal({Map<String, dynamic>? existing}) async {
     String? hari = existing?['hari'] ?? 'Senin';
+    int durasi = _durasiDari(existing);
     TimeOfDay mulai = existing != null
         ? TimeOfDay(
             hour: int.parse((existing['jamMulai'] as String).split(':')[0]),
@@ -210,9 +214,32 @@ class _DokterJadwalViewState extends State<DokterJadwalView> {
                   ),
                 ],
               ),
+              const SizedBox(height: 16),
+              const Text('Durasi per Konsultasi',
+                  style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: _Jd.textDark)),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _durasiPilihan.map((d) {
+                  final selected = durasi == d;
+                  return ChoiceChip(
+                    label: Text(d == 60 ? '1 jam' : '$d menit'),
+                    selected: selected,
+                    selectedColor: const Color(0xFFC9822E),
+                    labelStyle: TextStyle(
+                        color: selected ? Colors.white : _Jd.textDark,
+                        fontSize: 12.5),
+                    onSelected: (_) => setSheet(() => durasi = d),
+                  );
+                }).toList(),
+              ),
               const SizedBox(height: 12),
               Text(
-                '${hitungSlot(_menitKeJam(mulai.hour * 60 + mulai.minute), _menitKeJam(selesai.hour * 60 + selesai.minute)).length} slot × $durasiMenit menit tersedia',
+                '${hitungSlot(_menitKeJam(mulai.hour * 60 + mulai.minute), _menitKeJam(selesai.hour * 60 + selesai.minute), durasi).length} slot × $durasi menit tersedia',
                 style:
                     const TextStyle(fontSize: 11.5, color: _Jd.textGrey),
               ),
@@ -254,7 +281,7 @@ class _DokterJadwalViewState extends State<DokterJadwalView> {
       'hari': hari,
       'jamMulai': mulai.format(context),
       'jamSelesai': selesai.format(context),
-      'durasiMenit': durasiMenit,
+      'durasiMenit': durasi,
     };
 
     try {
@@ -318,8 +345,9 @@ class _DokterJadwalViewState extends State<DokterJadwalView> {
                       itemCount: _jadwal.length,
                       itemBuilder: (context, i) {
                         final j = _jadwal[i];
+                        final durasi = _durasiDari(j);
                         final slots =
-                            hitungSlot(j['jamMulai'], j['jamSelesai']);
+                            hitungSlot(j['jamMulai'], j['jamSelesai'], durasi);
                         return Container(
                           margin: const EdgeInsets.only(bottom: 12),
                           padding: const EdgeInsets.all(14),
@@ -353,7 +381,7 @@ class _DokterJadwalViewState extends State<DokterJadwalView> {
                                             color: _Jd.textDark)),
                                     const SizedBox(height: 3),
                                     Text(
-                                        '${j['jamMulai']} – ${j['jamSelesai']} • ${slots.length} slot',
+                                        '${j['jamMulai']} – ${j['jamSelesai']} • ${slots.length} slot × $durasi menit',
                                         style: const TextStyle(
                                             fontSize: 12,
                                             color: _Jd.textGrey)),

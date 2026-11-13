@@ -1,6 +1,7 @@
 ﻿import 'package:flutter/material.dart';
 import '../theme.dart';
 import '../services/riwayat_service.dart';
+import '../utils/penjelasan_migrain.dart';
 
 class DetailRiwayatSkriningPage extends StatelessWidget {
   const DetailRiwayatSkriningPage({super.key, required this.item});
@@ -233,6 +234,137 @@ class DetailRiwayatSkriningPage extends StatelessWidget {
                           fontSize: 12.5,
                           fontWeight: FontWeight.w700,
                           color: Color(0xFFC9822E),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 18),
+
+              // ---------- ✅ [REVISI DOSEN] PENJELASAN HASIL ----------
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.outline),
+                  boxShadow: AppShadows.card,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.menu_book_rounded,
+                            size: 18, color: Color(0xFFC9822E)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Apa itu ${item.hasil}?',
+                            style: const TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textDark,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      PenjelasanMigrain.penjelasan(item.hasil),
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        height: 1.6,
+                        color: AppColors.textDark,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // ✅ [REVISI DOSEN] KESIMPULAN dari seluruh hasil
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFC9822E).withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(Icons.tips_and_updates_rounded,
+                              size: 16, color: Color(0xFFC9822E)),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Kesimpulan: ${PenjelasanMigrain.kesimpulan(item.hasil, confidence: item.confidence)}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                height: 1.55,
+                                color: AppColors.textDark,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 14),
+
+              // ---------- ✅ [REVISI DOSEN] REKOMENDASI ----------
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.outline),
+                  boxShadow: AppShadows.card,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.volunteer_activism_rounded,
+                            size: 18, color: Color(0xFFC9822E)),
+                        SizedBox(width: 8),
+                        Text(
+                          'Rekomendasi untuk Anda',
+                          style: TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textDark,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    ...PenjelasanMigrain.rekomendasi(item.hasil).map(
+                      (r) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.check_circle_rounded,
+                                size: 15, color: Color(0xFF5BA97C)),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                r,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  height: 1.5,
+                                  color: AppColors.textDark,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
