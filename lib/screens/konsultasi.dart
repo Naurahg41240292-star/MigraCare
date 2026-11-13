@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -7,9 +9,154 @@ import '../models/dokter.dart';
 import '../theme.dart';
 import '../utils/rute.dart';
 import '../widgets/widget_konsultasi.dart';
-import 'chat_konsultasi.dart';
 import 'detail_dokter.dart';
 import 'dokter/chat_booking.dart';
+
+// ===========================================================================
+//  ATURAN SESI CHAT (identik dengan beranda dokter & halaman chat)
+//  Chat hanya boleh dibuka kalau:
+//  1. Status booking = 'dikonfirmasi'
+//  2. Waktu sekarang DI DALAM sesi: jam booking s/d jam booking + durasi
+//  Booking 'ditolak' / 'menunggu' / yang tanggalnya sudah lewat
+//  -> tombol chat tidak muncul (dan halaman chat juga tetap menolak).
+// ===========================================================================
+
+const Map<String, int> _namaBulan = {
+  'januari': 1, 'februari': 2, 'maret': 3, 'april': 4, 'mei': 5, 'juni': 6,
+  'juli': 7, 'agustus': 8, 'september': 9, 'oktober': 10, 'november': 11,
+  'desember': 12,
+  'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'jun': 6, 'jul': 7, 'agu': 8,
+  'ags': 8, 'sep': 9, 'okt': 10, 'nov': 11, 'des': 12,
+  'january': 1, 'february': 2, 'march': 3, 'may': 5, 'june': 6, 'july': 7,
+  'august': 8, 'sept': 9, 'october': 10, 'december': 12,
+};
+
+/// Ubah string 'tanggal' + 'jam' dari Firestore menjadi DateTime.
+/// Mendukung "5/11/2026", "5 November 2026", "2026-11-05", jam "08:30"/"8.30".
+DateTime? _parseWaktuBooking(String tanggal, String jam) {
+  // ---------------- jam ----------------
+  int hh = 0, mm = 0;
+  final mJam = RegExp(r'(\d{1,2})\s*[:.]\s*(\d{1,2})').firstMatch(jam.trim());
+  if (mJam != null) {
+    final h = int.tryParse(mJam.group(1)!) ?? 0;
+    final mnt = int.tryParse(mJam.group(2)!) ?? 0;
+    if (h <= 23 && mnt <= 59) {
+      hh = h;
+      mm = mnt;
+    }
+  } else {
+    final mBulat = RegExp(r'^(\d{1,2})$').firstMatch(jam.trim());
+    if (mBulat != null) {
+      final h = int.tryParse(mBulat.group(1)!) ?? 0;
+      if (h <= 23) hh = h;
+    }
+  }
+
+  // ---------------- tanggal ----------------
+  var t = tanggal.trim().toLowerCase();
+  t = t.replaceFirst(
+    RegExp(r'^(minggu|senin|selasa|rabu|kamis|jumat|jum.?at|sabtu)\s*,\s*'),
+    '',
+  );
+
+  int? thn, bln, tgl;
+  RegExpMatch? m;
+
+  // 1) ISO: 2026-11-05
+  m = RegExp(r'^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$').firstMatch(t);
+  if (m != null) {
+    thn = int.tryParse(m.group(1)!);
+    bln = int.tryParse(m.group(2)!);
+    tgl = int.tryParse(m.group(3)!);
+  }
+
+  // 2) d/m/yyyy (hari dulu, gaya Indonesia — format yang disimpan saat booking)
+  if (thn == null) {
+    m = RegExp(r'^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$').firstMatch(t);
+    if (m != null) {
+      tgl = int.tryParse(m.group(1)!);
+      bln = int.tryParse(m.group(2)!);
+      thn = int.tryParse(m.group(3)!);
+      if (thn != null && thn < 100) thn += 2000;
+    }
+  }
+
+  // 3) "5 november 2026" / "5 nov 2026"
+  if (thn == null) {
+    m = RegExp(r'^(\d{1,2})\s+([a-z]+)\.?\s+(\d{4})$').firstMatch(t);
+    if (m != null) {
+      tgl = int.tryParse(m.group(1)!);
+      bln = _namaBulan[m.group(2)!];
+      thn = int.tryParse(m.group(3)!);
+    }
+  }
+
+  // 4) "november 5, 2026"
+  if (thn == null) {
+    m = RegExp(r'^([a-z]+)\.?\s+(\d{1,2})\s*,?\s*(\d{4})$').firstMatch(t);
+    if (m != null) {
+      bln = _namaBulan[m.group(1)!];
+      tgl = int.tryParse(m.group(2)!);
+      thn = int.tryParse(m.group(3)!);
+    }
+  }
+
+  if (thn == null || bln == null || tgl == null) return null;
+  if (bln < 1 || bln > 12 || tgl < 1 || tgl > 31) return null;
+
+  return DateTime(thn, bln, tgl, hh, mm);
+}
+
+int _durasiBookingMenit(Map<String, dynamic> b) {
+  final v = b['durasiMenit'] ?? b['durasi'];
+  if (v is int && v > 0) return v;
+  if (v is num && v > 0) return v.round();
+  if (v is String) {
+    final n = int.tryParse(v.trim());
+    if (n != null && n > 0) return n;
+  }
+  return 30;
+}
+
+String _labelDurasiBooking(int menit) {
+  if (menit >= 60 && menit % 60 == 0) {
+    final j = menit ~/ 60;
+    return j == 1 ? '1 jam' : '$j jam';
+  }
+  return '$menit menit';
+}
+
+/// Kondisi sesi booking dibanding waktu sekarang:
+/// 'belum' | 'aktif' | 'lewat' | 'tidak_diketahui'
+String _hitungKondisiSesi(Map<String, dynamic> b, {DateTime? sekarang}) {
+  final tanggalStr = (b['tanggal'] ?? '').toString();
+  final jamStr = (b['jam'] ?? '').toString().trim();
+
+  final mulai = _parseWaktuBooking(tanggalStr, jamStr);
+  if (mulai == null) return 'tidak_diketahui';
+
+  final n = sekarang ?? DateTime.now();
+
+  // jam nggak tercatat/aneh -> anggap sesi sepanjang hari itu
+  final jamTercatat = RegExp(r'\d').hasMatch(jamStr);
+  final selesai = jamTercatat
+      ? mulai.add(Duration(minutes: _durasiBookingMenit(b)))
+      : DateTime(mulai.year, mulai.month, mulai.day, 23, 59, 59);
+
+  if (n.isBefore(mulai)) return 'belum';
+  if (n.isAfter(selesai)) return 'lewat';
+  return 'aktif';
+}
+
+/// ATURAN UTAMA: chat boleh dibuka hanya kalau
+/// status 'dikonfirmasi' DAN sesi sedang berjalan.
+bool _bisaBukaChat(Map<String, dynamic> b, {DateTime? sekarang}) {
+  if ((b['status'] ?? '').toString() != 'dikonfirmasi') return false;
+  final kondisi = _hitungKondisiSesi(b, sekarang: sekarang);
+  // format tanggal aneh/kosong -> jangan blokir (biar demo tetap jalan)
+  if (kondisi == 'tidak_diketahui') return true;
+  return kondisi == 'aktif';
+}
 
 class KonsultasiScreen extends StatefulWidget {
   final VoidCallback? onKembali;
@@ -36,9 +183,12 @@ class _KonsultasiScreenState extends State<KonsultasiScreen> {
   bool _loadingDokter = true;
   List<Dokter> _dokterFirestore = [];
 
-  // ✅ BARU: booking milik pasien (dari koleksi booking/)
+  // ✅ booking milik pasien (dari koleksi booking/)
   List<Map<String, dynamic>> _bookings = [];
   bool _loadingBooking = false;
+
+  // ✅ refresh status sesi otomatis (cuma pas tab Riwayat aktif)
+  Timer? _ticker;
 
   bool get _tampilkanRiwayat => _chip == 'Riwayat';
 
@@ -48,6 +198,18 @@ class _KonsultasiScreenState extends State<KonsultasiScreen> {
     _muatNama();
     _muatDokterFirestore();
     _muatBooking();
+    _ticker = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (!mounted) return;
+      // muat ulang booking tanpa spinner — status sesi & tombol chat
+      // ikut ter-update otomatis saat dokter mengkonfirmasi / sesi lewat
+      if (_tampilkanRiwayat) _muatBooking(senyap: true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
   }
 
   // ✅ Ambil nama user untuk sapaan
@@ -77,13 +239,15 @@ class _KonsultasiScreenState extends State<KonsultasiScreen> {
       setState(() => _loadingDokter = false);
     }
   }
+
   // ✅ Ambil booking milik pasien yang login
-  Future<void> _muatBooking() async {
-    setState(() => _loadingBooking = true);
+  // [senyap=true] -> tanpa spinner & tanpa snackbar (untuk auto-refresh)
+  Future<void> _muatBooking({bool senyap = false}) async {
+    if (!senyap) setState(() => _loadingBooking = true);
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
-        if (mounted) setState(() => _loadingBooking = false);   // ← loading dimatikan
+        if (mounted && !senyap) setState(() => _loadingBooking = false);
         return;
       }
 
@@ -107,18 +271,18 @@ class _KonsultasiScreenState extends State<KonsultasiScreen> {
             'booking': data,
           };
         }).toList();
-        _loadingBooking = false;                                 // ← loading dimatikan ✅
+        if (!senyap) _loadingBooking = false;
       });
     } catch (e) {
-      debugPrint('Gagal muat booking: $e');                      // ← error TAMPIL di console
-      if (mounted) {
-        setState(() => _loadingBooking = false);                 // ← loading dimatikan ✅
+      debugPrint('Gagal muat booking: $e');
+      if (mounted && !senyap) {
+        setState(() => _loadingBooking = false);
         ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Gagal memuat booking: $e'))); // ← error TAMPIL di layar
+            SnackBar(content: Text('Gagal memuat booking: $e')));
       }
     }
   }
-  
+
   List<Dokter> get _dokterTerfilter {
     final q = _query.trim().toLowerCase();
     final sumber = _dokterFirestore.isNotEmpty ? _dokterFirestore : daftarDokter;
@@ -148,17 +312,7 @@ class _KonsultasiScreenState extends State<KonsultasiScreen> {
     );
   }
 
-  void _bukaChat(Dokter d) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ChatKonsultasiScreen(dokter: d),
-        settings: const RouteSettings(name: Rute.chatKonsultasi),
-      ),
-    );
-  }
-
-  // ✅ BARU: buka chat BOOKING (pasien ↔ dokter asli)
+  // ✅ buka chat BOOKING (pasien ↔ dokter asli)
   void _bukaChatBooking(Map<String, dynamic> b) {
     Navigator.push(
       context,
@@ -286,7 +440,7 @@ class _KonsultasiScreenState extends State<KonsultasiScreen> {
           borderRadius: BorderRadius.circular(20),
           onTap: () {
             setState(() => _chip = c);
-            // ✅ BARU: saat pilih "Riwayat" → muat ulang booking
+            // ✅ saat pilih "Riwayat" → muat ulang booking
             if (c == 'Riwayat') _muatBooking();
           },
           child: Container(
@@ -319,7 +473,8 @@ class _KonsultasiScreenState extends State<KonsultasiScreen> {
     );
   }
 
-  // ✅ DIGANTI: Riwayat = daftar BOOKING real dari Firestore + tombol Chat
+  // ==================== RIWAYAT BOOKING PASIEN ====================
+
   Widget _listRiwayat() {
     if (_loadingBooking) {
       return const Center(child: CircularProgressIndicator());
@@ -328,90 +483,176 @@ class _KonsultasiScreenState extends State<KonsultasiScreen> {
       return _kosong('Belum ada booking konsultasi.\n'
           'Booking lewat detail dokter ya!');
     }
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
-      itemCount: _bookings.length,
-      itemBuilder: (_, i) {
-        final b = _bookings[i];
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: AppColors.card,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: AppShadows.card,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ---- baris nama + badge status ----
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(b['dokterNama'],
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textDark)),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: b['status'] == 'dikonfirmasi'
-                          ? const Color(0xFFE4F3E4)
-                          : (b['status'] == 'ditolak'
-                              ? const Color(0xFFFCE8E6)
-                              : const Color(0xFFFDF3D7)),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(b['status'],
-                        style: TextStyle(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w700,
-                            color: b['status'] == 'dikonfirmasi'
-                                ? const Color(0xFF3E7C3E)
-                                : (b['status'] == 'ditolak'
-                                    ? const Color(0xFFE55555)
-                                    : const Color(0xFFC99A2C)))),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text('${b['hari']}, ${b['tanggal']} • ${b['jam']} (30 menit)',
-                  style: const TextStyle(
-                      fontSize: 12.5, color: AppColors.textSoft)),
+    return RefreshIndicator(
+      onRefresh: _muatBooking,
+      child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+        itemCount: _bookings.length,
+        itemBuilder: (_, i) => _kartuRiwayatBooking(_bookings[i]),
+      ),
+    );
+  }
 
-              // ---- ✅ TOMBOL CHAT — hanya untuk booking DIKONFIRMASI ----
-              if (b['status'] == 'dikonfirmasi') ...[
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  height: 42,
-                  child: ElevatedButton.icon(
-                    onPressed: () => _bukaChatBooking(b),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
-                    ),
-                    icon: const Icon(Icons.chat_rounded, size: 16),
-                    label: const Text('Chat Sekarang',
-                        style: TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w700)),
-                  ),
+  Widget _kartuRiwayatBooking(Map<String, dynamic> b) {
+    final booking = b['booking'] as Map<String, dynamic>;
+    final status = (b['status'] ?? 'menunggu') as String;
+    final kondisi = _hitungKondisiSesi(booking);
+    final durasi = _durasiBookingMenit(booking);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: AppShadows.card,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ---- baris nama + badge status ----
+          Row(
+            children: [
+              Expanded(
+                child: Text(b['dokterNama'],
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textDark)),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _chipBg(status, kondisi),
+                  borderRadius: BorderRadius.circular(20),
                 ),
-              ],
+                child: Text(_chipLabel(status, kondisi),
+                    style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                        color: _chipTextColor(status, kondisi))),
+              ),
             ],
           ),
-        );
-      },
+          const SizedBox(height: 4),
+          Text(
+            '${b['hari']}, ${b['tanggal']} • ${b['jam']} (${_labelDurasiBooking(durasi)})',
+            style: const TextStyle(
+                fontSize: 12.5, color: AppColors.textSoft),
+          ),
+
+          // ---- AREA AKSI (sesuai status + waktu) ----
+          if (status == 'dikonfirmasi' && _bisaBukaChat(booking)) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 42,
+              child: ElevatedButton.icon(
+                onPressed: () => _bukaChatBooking(b),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+                icon: const Icon(Icons.chat_rounded, size: 16),
+                label: const Text('Chat Sekarang',
+                    style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700)),
+              ),
+            ),
+          ] else if (status == 'dikonfirmasi' && kondisi == 'belum') ...[
+            const SizedBox(height: 12),
+            _infoRiwayat(
+              Icons.schedule_rounded,
+              'Chat terbuka saat sesi dimulai (${b['jam']}).',
+            ),
+          ] else if (status == 'dikonfirmasi' && kondisi == 'lewat') ...[
+            const SizedBox(height: 12),
+            _infoRiwayat(
+              Icons.hourglass_bottom_rounded,
+              'Sesi konsultasi sudah berakhir.',
+            ),
+          ] else if (status == 'menunggu' && kondisi != 'lewat') ...[
+            const SizedBox(height: 12),
+            _infoRiwayat(
+              Icons.hourglass_top_rounded,
+              'Menunggu konfirmasi dokter.',
+            ),
+          ] else if (status == 'menunggu' && kondisi == 'lewat') ...[
+            const SizedBox(height: 12),
+            _infoRiwayat(
+              Icons.event_busy_rounded,
+              'Booking kedaluwarsa — tanggal konsultasi sudah lewat.',
+            ),
+          ],
+          // status 'ditolak' -> tidak ada tombol/info (chat terkunci)
+        ],
+      ),
     );
+  }
+
+  Widget _infoRiwayat(IconData icon, String text) {
+    return Container(
+      width: double.infinity,
+      padding:
+          const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+      decoration: BoxDecoration(
+        color: AppColors.chipBg,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: AppColors.textFaint),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(text,
+                style: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textSoft)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _chipBg(String status, String kondisi) {
+    if (status == 'ditolak') return const Color(0xFFFCE8E6);
+    if (status == 'dikonfirmasi') {
+      return kondisi == 'lewat'
+          ? const Color(0xFFEFEAE1)
+          : const Color(0xFFE4F3E4);
+    }
+    return kondisi == 'lewat'
+        ? const Color(0xFFEFEAE1)
+        : const Color(0xFFFDF3D7);
+  }
+
+  Color _chipTextColor(String status, String kondisi) {
+    if (status == 'ditolak') return const Color(0xFFE55555);
+    if (status == 'dikonfirmasi') {
+      return kondisi == 'lewat'
+          ? const Color(0xFF8A8075)
+          : const Color(0xFF3E7C3E);
+    }
+    return kondisi == 'lewat'
+        ? const Color(0xFF8A8075)
+        : const Color(0xFFC99A2C);
+  }
+
+  String _chipLabel(String status, String kondisi) {
+    if (status == 'ditolak') return 'Ditolak';
+    if (status == 'dikonfirmasi') {
+      return kondisi == 'lewat' ? 'Selesai' : 'Dikonfirmasi';
+    }
+    return kondisi == 'lewat' ? 'Kedaluwarsa' : 'Menunggu';
   }
 
   Widget _kosong(String pesan) {
@@ -468,51 +709,6 @@ class _KartuDokter extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           const BadgeOnline(),
-          const SizedBox(width: 4),
-          const Icon(Icons.chevron_right_rounded, color: AppColors.textFaint),
-        ],
-      ),
-    );
-  }
-}
-
-class _KartuRiwayat extends StatelessWidget {
-  final Dokter dokter;
-  final String topik;
-  final String tanggal;
-  final String status;
-  final VoidCallback onTap;
-
-  const _KartuRiwayat({
-    required this.dokter,
-    required this.topik,
-    required this.tanggal,
-    required this.status,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return _cangkangKartu(
-      onTap: onTap,
-      child: Row(
-        children: [
-          AvatarDokter(dokter: dokter, size: 54),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(dokter.nama, maxLines: 1, overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textDark)),
-                const SizedBox(height: 2),
-                Text('$topik • $tanggal', maxLines: 1, overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 12.5, color: AppColors.textSoft)),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          BadgeOnline(label: status),
           const SizedBox(width: 4),
           const Icon(Icons.chevron_right_rounded, color: AppColors.textFaint),
         ],

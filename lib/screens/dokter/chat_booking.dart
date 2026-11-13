@@ -5,14 +5,18 @@ import 'dokter_detail_pasien.dart';
 
 /// ==========================================================================
 ///  MIGRACARE — Chat Pasien ↔ Dokter (berbasis Booking, realtime Firestore)
-///  - Timer sesi: dimulai saat chat pertama dibuka / tepat jam booking
-///  - ✅ [REVISI DOSEN] Durasi sesi ikut pilihan dokter saat atur jadwal
-///    (15 / 30 / 60 menit) — dibaca dari booking.durasiMenit
+///  - ✅ [REVISI DOSEN] Durasi sesi ikut pilihan dokter (15 / 30 / 60 menit)
+///  - ✅ [REVISI DOSEN] Sesi chat TERIKAT SLOT BOOKING:
+///        mulai  = jam booking
+///        berakhir = jam booking + durasi
+///    Di luar window itu chat TERKUNCI:
+///      • sebelum jam booking -> layar "Chat Belum Dibuka" + hitung mundur
+///      • setelah sesi lewat  -> ditendang keluar (tidak bisa chat lagi)
+///      • status 'ditolak' / 'menunggu' -> ditendang keluar
+///    Field chatDimulaiPada tetap ditulis sebagai penanda, tapi tidak
+///    lagi menentukan akhir sesi.
 ///  - Dokter bisa kirim pesan REKOMENDASI (tampil khusus)
 ///  - Titik tiga kanan atas -> Detail Pasien (khusus dokter)
-///  - Gerbang jadwal: chat terkunci sampai TEPAT jam booking.
-///    Sesi baru dihitung mulai jam booking, bukan saat halaman
-///    dibuka lebih awal.
 ///  File: lib/screens/dokter/chat_booking.dart
 ///  ✅ Mandiri: warna internal (_Cb) — tidak bergantung theme.dart
 /// ==========================================================================
@@ -39,6 +43,115 @@ abstract class _Cb {
   ];
 }
 
+// ===========================================================================
+//  UTILITAS WAKTU BOOKING (mandiri, sama logikanya dengan beranda dokter)
+//  Mendukung: "5/11/2026", "5 November 2026", "2026-11-05", "05.11.2026",
+//  jam "08:30", "8.30", "08:30 WIB", dsb.
+// ===========================================================================
+
+const Map<String, int> _namaBulan = {
+  'januari': 1, 'februari': 2, 'maret': 3, 'april': 4, 'mei': 5, 'juni': 6,
+  'juli': 7, 'agustus': 8, 'september': 9, 'oktober': 10, 'november': 11,
+  'desember': 12,
+  'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'jun': 6, 'jul': 7, 'agu': 8,
+  'ags': 8, 'sep': 9, 'okt': 10, 'nov': 11, 'des': 12,
+  'january': 1, 'february': 2, 'march': 3, 'may': 5, 'june': 6, 'july': 7,
+  'august': 8, 'sept': 9, 'october': 10, 'december': 12,
+};
+
+DateTime? _parseWaktuBooking(String tanggal, String jam) {
+  // ---------------- jam ----------------
+  int hh = 0, mm = 0;
+  final mJam = RegExp(r'(\d{1,2})\s*[:.]\s*(\d{1,2})').firstMatch(jam.trim());
+  if (mJam != null) {
+    final h = int.tryParse(mJam.group(1)!) ?? 0;
+    final mnt = int.tryParse(mJam.group(2)!) ?? 0;
+    if (h <= 23 && mnt <= 59) {
+      hh = h;
+      mm = mnt;
+    }
+  } else {
+    final mBulat = RegExp(r'^(\d{1,2})$').firstMatch(jam.trim());
+    if (mBulat != null) {
+      final h = int.tryParse(mBulat.group(1)!) ?? 0;
+      if (h <= 23) hh = h;
+    }
+  }
+
+  // ---------------- tanggal ----------------
+  var t = tanggal.trim().toLowerCase();
+  t = t.replaceFirst(
+    RegExp(r'^(minggu|senin|selasa|rabu|kamis|jumat|jum.?at|sabtu)\s*,\s*'),
+    '',
+  );
+
+  int? thn, bln, tgl;
+  RegExpMatch? m;
+
+  // 1) ISO: 2026-11-05
+  m = RegExp(r'^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$').firstMatch(t);
+  if (m != null) {
+    thn = int.tryParse(m.group(1)!);
+    bln = int.tryParse(m.group(2)!);
+    tgl = int.tryParse(m.group(3)!);
+  }
+
+  // 2) d/m/yyyy (hari dulu, gaya Indonesia)
+  if (thn == null) {
+    m = RegExp(r'^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$').firstMatch(t);
+    if (m != null) {
+      tgl = int.tryParse(m.group(1)!);
+      bln = int.tryParse(m.group(2)!);
+      thn = int.tryParse(m.group(3)!);
+      if (thn != null && thn < 100) thn += 2000;
+    }
+  }
+
+  // 3) "5 november 2026" / "5 nov 2026"
+  if (thn == null) {
+    m = RegExp(r'^(\d{1,2})\s+([a-z]+)\.?\s+(\d{4})$').firstMatch(t);
+    if (m != null) {
+      tgl = int.tryParse(m.group(1)!);
+      bln = _namaBulan[m.group(2)!];
+      thn = int.tryParse(m.group(3)!);
+    }
+  }
+
+  // 4) "november 5, 2026"
+  if (thn == null) {
+    m = RegExp(r'^([a-z]+)\.?\s+(\d{1,2})\s*,?\s*(\d{4})$').firstMatch(t);
+    if (m != null) {
+      bln = _namaBulan[m.group(1)!];
+      tgl = int.tryParse(m.group(2)!);
+      thn = int.tryParse(m.group(3)!);
+    }
+  }
+
+  if (thn == null || bln == null || tgl == null) return null;
+  if (bln < 1 || bln > 12 || tgl < 1 || tgl > 31) return null;
+
+  return DateTime(thn, bln, tgl, hh, mm);
+}
+
+int _durasiDariMap(Map<String, dynamic> b) {
+  final v = b['durasiMenit'] ?? b['durasi'];
+  if (v is int && v > 0) return v;
+  if (v is num && v > 0) return v.round();
+  if (v is String) {
+    final n = int.tryParse(v.trim());
+    if (n != null && n > 0) return n;
+  }
+  return 30;
+}
+
+String _labelDurasi(int menit) {
+  if (menit >= 60 && menit % 60 == 0) {
+    final j = menit ~/ 60;
+    return j == 1 ? '1 jam' : '$j jam';
+  }
+  return '$menit menit';
+}
+
 class ChatBookingPage extends StatefulWidget {
   const ChatBookingPage({
     super.key,
@@ -60,16 +173,18 @@ class _ChatBookingPageState extends State<ChatBookingPage> {
   final _scroll = ScrollController();
 
   // ✅ [REVISI DOSEN] durasi sesi ikut pilihan dokter saat booking
-  // (booking lama yang tidak punya field ini → default 30 menit)
-  int get durasiMenit =>
-      (widget.booking['durasiMenit'] as num?)?.toInt() ?? 30;
+  int _durasiMenit = 30;
 
   Timer? _ticker;
   int _sisaDetik = -1;
+  bool _sudahDialogBerakhir = false;
 
   // 🔒 Gerbang jadwal: true = belum jam booking, chat terkunci
   bool _gerbangTutup = false;
   Timer? _gerbangTicker;
+
+  // 🔒 Kalau tidak null -> halaman ditendang keluar dengan alasan ini
+  String? _alasanTerkunci;
 
   FirebaseFirestore get _db => FirebaseFirestore.instance;
   DocumentReference<Map<String, dynamic>> get _bookingRef =>
@@ -85,23 +200,21 @@ class _ChatBookingPageState extends State<ChatBookingPage> {
       : (widget.booking['dokterNama'] ?? 'Dokter');
   String get _peranSaya => widget.sayaDokter ? 'dokter' : 'pasien';
 
-  // 🔒 Waktu booking lengkap dari data booking (tanggal + jam)
-  // format tanggal: 'd/m/yyyy' — format jam: 'HH:mm'
-  DateTime? get _waktuBooking {
-    final tanggal = (widget.booking['tanggal'] ?? '').toString();
-    final jam = (widget.booking['jam'] ?? '').toString();
-    final pT = tanggal.split('/');
-    final pJ = jam.split(':');
-    if (pT.length != 3 || pJ.length != 2) return null;
-    final d = int.tryParse(pT[0].trim());
-    final m = int.tryParse(pT[1].trim());
-    final y = int.tryParse(pT[2].trim());
-    final h = int.tryParse(pJ[0].trim());
-    final mi = int.tryParse(pJ[1].trim());
-    if (d == null || m == null || y == null || h == null || mi == null) {
-      return null;
-    }
-    return DateTime(y, m, d, h, mi);
+  // 🔒 Waktu mulai sesi = jam booking (tanggal + jam dari data booking)
+  DateTime? get _waktuBooking => _parseWaktuBooking(
+        (widget.booking['tanggal'] ?? '').toString(),
+        (widget.booking['jam'] ?? '').toString(),
+      );
+
+  // 🔒 Akhir sesi = jam booking + durasi (terikat slot, bukan saat dibuka)
+  DateTime? get _akhirSesi {
+    final wb = _waktuBooking;
+    if (wb == null) return null;
+    final jamTercatat = RegExp(r'\d')
+        .hasMatch((widget.booking['jam'] ?? '').toString().trim());
+    return jamTercatat
+        ? wb.add(Duration(minutes: _durasiMenit))
+        : DateTime(wb.year, wb.month, wb.day, 23, 59, 59);
   }
 
   /// Countdown "terbuka dalam" (HH:MM:SS)
@@ -114,12 +227,43 @@ class _ChatBookingPageState extends State<ChatBookingPage> {
     return '${dua(sisa ~/ 3600)}:${dua((sisa % 3600) ~/ 60)}:${dua(sisa % 60)}';
   }
 
-  @override
-  void initState() {
-    super.initState();
-    // 🔒 Cek gerbang jadwal sebelum apa-apa
-    final wb = _waktuBooking;
-    _gerbangTutup = wb != null && DateTime.now().isBefore(wb);
+  // =========================================================================
+  //  GERBANG AKSES — dipanggil sekali di initState
+  // =========================================================================
+  void _evaluasiAkses() {
+    _durasiMenit = _durasiDariMap(widget.booking);
+    final statusRaw = widget.booking['status'];
+    final status = statusRaw == null ? '' : statusRaw.toString();
+
+    // status jelas ditolak / belum dikonfirmasi -> langsung tendang
+    if (status == 'ditolak') {
+      _alasanTerkunci = 'Booking ini telah ditolak — chat tidak tersedia.';
+    } else if (status == 'menunggu') {
+      _alasanTerkunci = 'Booking belum dikonfirmasi dokter.';
+    }
+
+    // cek window waktu (untuk semua status, kecuali yang sudah ditendang di atas)
+    if (_alasanTerkunci == null) {
+      final wb = _waktuBooking;
+      if (wb != null) {
+        final sekarang = DateTime.now();
+        if (sekarang.isBefore(wb)) {
+          _gerbangTutup = true; // belum mulai -> layar hitung mundur
+        } else {
+          final akhir = _akhirSesi;
+          if (akhir != null && sekarang.isAfter(akhir)) {
+            _alasanTerkunci =
+                'Jadwal konsultasi sudah lewat — sesi chat berakhir.';
+          }
+        }
+      }
+    }
+
+    if (_alasanTerkunci != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _tendangKeluar());
+      return;
+    }
+
     if (_gerbangTutup) {
       // belum jam booking → pantau tiap detik, begitu tepat waktu buka chat
       _gerbangTicker = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -128,16 +272,69 @@ class _ChatBookingPageState extends State<ChatBookingPage> {
           _gerbangTicker?.cancel();
           if (mounted) {
             setState(() => _gerbangTutup = false);
-            _initChatMulai(); // baru sekarang sesi dihitung
+            _mulaiSesi(); // baru sekarang sesi berjalan
           }
         }
       });
     } else {
-      _initChatMulai();
+      _mulaiSesi();
     }
   }
 
-  Future<void> _initChatMulai() async {
+  // =========================================================================
+  //  CEK LIVE: status terbaru dari Firestore (map bisa saja basi)
+  // =========================================================================
+  Future<void> _verifikasiBookingLive() async {
+    try {
+      final doc = await _bookingRef.get();
+      final data = doc.data();
+      if (data == null || !mounted) return;
+
+      // update durasi kalau ada di firestore
+      final v = data['durasiMenit'] ?? data['durasi'];
+      int? d;
+      if (v is num && v > 0) d = v.round();
+      if (v is String) d = int.tryParse(v.trim());
+      if (d != null && d > 0 && d != _durasiMenit) {
+        setState(() => _durasiMenit = d!);
+      }
+
+      final statusLive =
+          (data['status'] ?? widget.booking['status'] ?? 'menunggu')
+              .toString();
+      if (statusLive != 'dikonfirmasi') {
+        _alasanTerkunci = statusLive == 'ditolak'
+            ? 'Booking ini telah ditolak — chat tidak tersedia.'
+            : 'Booking belum dikonfirmasi dokter.';
+        _tendangKeluar();
+      }
+    } catch (_) {
+      // gagal baca (offline dsb) -> biarkan pakai data map
+    }
+  }
+
+  /// Tendang keluar + snackbar alasan (tampil di halaman sebelumnya)
+  void _tendangKeluar() {
+    if (!mounted) return;
+    final alasan = _alasanTerkunci ?? 'Sesi konsultasi tidak tersedia.';
+    final messenger = ScaffoldMessenger.of(context);
+    Navigator.of(context).maybePop();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(alasan),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: const Color(0xFF3D2B1A),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+
+  // =========================================================================
+  //  SESI BERJALAN
+  // =========================================================================
+  Future<void> _mulaiSesi() async {
+    // penanda chat pernah dibuka (tidak menentukan akhir sesi)
     try {
       final doc = await _bookingRef.get();
       if (doc.data()?['chatDimulaiPada'] == null) {
@@ -145,23 +342,73 @@ class _ChatBookingPageState extends State<ChatBookingPage> {
             .update({'chatDimulaiPada': FieldValue.serverTimestamp()});
       }
     } catch (_) {}
-    _mulaiTicker();
-  }
 
-  void _mulaiTicker() {
-    _ticker = Timer.periodic(const Duration(seconds: 1), (_) async {
-      try {
-        final doc = await _bookingRef.get();
-        final mulai = doc.data()?['chatDimulaiPada'];
-        if (mulai is! Timestamp || !mounted) return;
-        // ✅ [REVISI DOSEN] habisnya sesi ikut durasi booking
-        final habis =
-            mulai.toDate().add(Duration(minutes: durasiMenit));
-        final sisa = habis.difference(DateTime.now()).inSeconds;
-        setState(() => _sisaDetik = sisa < 0 ? 0 : sisa);
-      } catch (_) {}
+    _hitungSisa();
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) _hitungSisa();
     });
   }
+
+  void _hitungSisa() {
+    final akhir = _akhirSesi;
+    if (akhir == null) {
+      if (_sisaDetik != -1) setState(() => _sisaDetik = -1);
+      return;
+    }
+    final sisa = akhir.difference(DateTime.now()).inSeconds;
+    final baru = sisa < 0 ? 0 : sisa;
+    if (baru != _sisaDetik) setState(() => _sisaDetik = baru);
+    if (baru == 0 && !_sudahDialogBerakhir) {
+      _sudahDialogBerakhir = true;
+      _showDialogBerakhir();
+    }
+  }
+
+  void _showDialogBerakhir() {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Row(
+          children: [
+            Icon(Icons.hourglass_bottom_rounded,
+                size: 22, color: _Cb.accentDark),
+            SizedBox(width: 8),
+            Text('Sesi Berakhir',
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: _Cb.textDark)),
+          ],
+        ),
+        content: Text(
+          'Waktu konsultasi ${_labelDurasi(_durasiMenit)} sudah habis. '
+          'Chat ditutup otomatis sesuai jadwal booking.',
+          style: const TextStyle(
+              fontSize: 13, height: 1.5, color: _Cb.textGrey),
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _Cb.primary,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Mengerti',
+                style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // -------------------------------------------------------------------------
 
   String get _formatSisa {
     if (_sisaDetik < 0) return '--:--';
@@ -272,6 +519,13 @@ class _ChatBookingPageState extends State<ChatBookingPage> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _evaluasiAkses();          // gerbang cepat dari data map
+    _verifikasiBookingLive();  // konfirmasi status terbaru dari Firestore
+  }
+
+  @override
   void dispose() {
     _gerbangTicker?.cancel();
     _ticker?.cancel();
@@ -304,8 +558,10 @@ class _ChatBookingPageState extends State<ChatBookingPage> {
               _gerbangTutup
                   ? 'Chat dibuka saat jadwal booking'
                   : _sesiHabis
-                      ? 'Sesi $durasiMenit menit berakhir'
-                      : 'Sesi: $_formatSisa tersisa',
+                      ? 'Sesi ${_labelDurasi(_durasiMenit)} berakhir'
+                      : (_sisaDetik < 0
+                          ? 'Sesi konsultasi berjalan'
+                          : 'Sesi: $_formatSisa tersisa'),
               style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
@@ -433,7 +689,7 @@ class _ChatBookingPageState extends State<ChatBookingPage> {
                   ),
                   const SizedBox(height: 4),
                   // ✅ [REVISI DOSEN] tampilin durasi sesi juga
-                  Text('Pukul $jam • $durasiMenit menit',
+                  Text('Pukul $jam • ${_labelDurasi(_durasiMenit)}',
                       style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
@@ -597,7 +853,7 @@ class _ChatBookingPageState extends State<ChatBookingPage> {
                     border: InputBorder.none,
                     isDense: true,
                     hintText: mati
-                        ? 'Sesi $durasiMenit menit telah berakhir'
+                        ? 'Sesi ${_labelDurasi(_durasiMenit)} telah berakhir'
                         : 'Ketik pesan...',
                     hintStyle:
                         const TextStyle(fontSize: 13.5, color: _Cb.textFaint),

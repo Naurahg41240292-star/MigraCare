@@ -4,10 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../models/dokter.dart';
 import '../theme.dart';
-import '../utils/rute.dart';
 import '../utils/tanggal.dart';
 import '../widgets/widget_konsultasi.dart';
-import 'chat_konsultasi.dart';
 
 class DetailDokterScreen extends StatefulWidget {
   final Dokter dokter;
@@ -161,6 +159,14 @@ class _DetailDokterScreenState extends State<DetailDokterScreen> {
           ? ''
           : '${_tanggalPilihan!.day}/${_tanggalPilihan!.month}/${_tanggalPilihan!.year}';
 
+  // ✅ apakah tanggal yang dipilih = hari ini?
+  bool get _pilihHariIni {
+    final t = _tanggalPilihan;
+    if (t == null) return false;
+    final n = DateTime.now();
+    return t.year == n.year && t.month == n.month && t.day == n.day;
+  }
+
   // apakah slot jam ini sudah dibooking pasien lain?
   bool _sudahDibooking(String slot) =>
       _jamTerpakai.contains('$_kunciTanggalPilihan|$slot');
@@ -168,9 +174,18 @@ class _DetailDokterScreenState extends State<DetailDokterScreen> {
   // ✅ [REVISI DOSEN] slot hari ini + durasinya (slot '08:15' → 15 menit)
   Map<String, int> get _slotDurasiHariIni {
     final map = <String, int>{};
+
+    // ✅ slot di hari INI yang jamnya sudah lewat tidak muncul lagi —
+    // kalau tidak, pasien bisa booking jam lampau → dokter confirm →
+    // chat langsung terkunci karena "jadwal sudah lewat"
+    final hariIni = _pilihHariIni;
+    final n = DateTime.now();
+    final menitSekarang = n.hour * 60 + n.minute;
+
     for (final j in _jadwalHariIni) {
       final d = _durasiDari(j);
       for (final s in _hitungSlot(j['jamMulai'], j['jamSelesai'], d)) {
+        if (hariIni && _jamKeMenit(s) < menitSekarang) continue;
         map.putIfAbsent(s, () => d);
       }
     }
@@ -413,7 +428,7 @@ class _DetailDokterScreenState extends State<DetailDokterScreen> {
                                       fontSize: 12.5, color: AppColors.textSoft),
                                 ),
                               ] else ...[
-                                // semua slot di tanggal ini sudah dibooking
+                                // slot hari ini habis (dibooking semua / sudah lewat)
                                 Container(
                                   width: double.infinity,
                                   padding: const EdgeInsets.all(14),
@@ -422,9 +437,11 @@ class _DetailDokterScreenState extends State<DetailDokterScreen> {
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(color: AppColors.divider),
                                   ),
-                                  child: const Text(
-                                    'Semua jam pada tanggal ini sudah dibooking 🙏\nCoba pilih tanggal lain ya!',
-                                    style: TextStyle(fontSize: 12.5, color: AppColors.textSoft),
+                                  child: Text(
+                                    _pilihHariIni
+                                        ? 'Slot hari ini sudah lewat / penuh 🙏\nCoba pilih tanggal lain ya!'
+                                        : 'Semua jam pada tanggal ini sudah dibooking 🙏\nCoba pilih tanggal lain ya!',
+                                    style: const TextStyle(fontSize: 12.5, color: AppColors.textSoft),
                                   ),
                                 ),
                               ],
