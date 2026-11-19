@@ -103,30 +103,6 @@ class _DokterProfilViewState extends State<DokterProfilView> {
     return '${t.day} ${bulan[t.month - 1]} ${t.year}';
   }
 
-  void _dialogSederhana(String judul, String isi, IconData ikon) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Icon(ikon, color: _Pf.gold, size: 22),
-            const SizedBox(width: 10),
-            Expanded(child: Text(judul, style: const TextStyle(fontSize: 17))),
-          ],
-        ),
-        content: Text(isi,
-            style: const TextStyle(fontSize: 13.5, height: 1.5)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Tutup'),
-          ),
-        ],
-      ),
-    );
-  }
-
   Future<void> _editProfil() async {
     await Navigator.push(
       context,
@@ -379,17 +355,6 @@ class _DokterProfilViewState extends State<DokterProfilView> {
                               builder: (_) => const KeamananAkunPage()),
                         );
                       },
-                    ),
-                    _menu(
-                      Icons.help_outline_rounded,
-                      'Pusat Bantuan',
-                      'Cara pakai aplikasi & hubungi tim',
-                      () => _dialogSederhana(
-                        'Pusat Bantuan',
-                        'Ada kendala atau mau bertanya seputar MigraCare? '
-                            'Hubungi tim lewat grup kelompok kalian ya.',
-                        Icons.help_outline_rounded,
-                      ),
                     ),
                     _menu(
                       Icons.info_outline_rounded,
