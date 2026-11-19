@@ -16,17 +16,16 @@ abstract class _Bd {
 }
 
 /// ==========================================================================
-///  ATURAN SESI CHAT (revisi: chat dikunci sesuai status & jadwal)
+///  ATURAN SESI CHAT (revisi: sesi berakhir tetap bisa buka ROOM — lihat saja)
 ///  --------------------------------------------------------------------------
-///  Chat hanya bisa dibuka kalau SEMUA syarat terpenuhi:
-///  1. Status booking = 'dikonfirmasi'
-///  2. Waktu sekarang berada DI DALAM sesi konsultasi:
-///        jam mulai  <=  sekarang  <=  jam mulai + durasi
-///
-///  Akibatnya otomatis:
-///  - Booking 'ditolak'    -> tombol chat hilang total
+///  - Booking 'ditolak'    -> tombol chat hilang total (terkunci)
 ///  - Booking 'menunggu'   -> tetap tampil tombol Tolak/Konfirmasi (bukan chat)
-///  - Tanggal sudah lewat  -> chip 'Kedaluwarsa'/'Selesai', chat terkunci
+///  - Sesi AKTIF (dikonfirmasi, jam mulai <= sekarang <= jam selesai)
+///        -> tombol 'Buka Chat' oranye: chat penuh, bisa kirim pesan
+///  - Sesi BERAKHIR (dikonfirmasi, sekarang > jam selesai)
+///        -> tombol 'Lihat Room Chat' abu-abu: room masih bisa dibuka,
+///           riwayat pesan kelihatan, tapi TIDAK bisa kirim pesan lagi
+///           (mode lihat saja diatur di dalam ChatBookingPage)
 /// ==========================================================================
 
 const Map<String, int> _namaBulan = {
@@ -171,6 +170,17 @@ bool bisaBukaChat(Map<String, dynamic> b, {DateTime? sekarang}) {
   return kondisi == 'aktif';
 }
 
+/// REVISI: room chat boleh DIBUKA kalau status 'dikonfirmasi' —
+/// TERMASUK saat sesi sudah berakhir (mode lihat saja, tidak bisa kirim).
+/// Dipakai untuk tombol 'Lihat Room Chat' di kartu berstatus 'Selesai'.
+bool bisaBukaRoomChat(Map<String, dynamic> b, {DateTime? sekarang}) {
+  if ((b['status'] ?? '').toString() != 'dikonfirmasi') return false;
+  final kondisi = hitungKondisiSesi(b, sekarang: sekarang);
+  // Format tanggal aneh / kosong -> jangan blokir (biar demo tetap jalan)
+  if (kondisi == 'tidak_diketahui') return true;
+  return kondisi == 'aktif' || kondisi == 'lewat';
+}
+
 /// TAB Beranda — dashboard sesuai desain Figma + Booking Masuk
 class DokterBerandaView extends StatefulWidget {
   const DokterBerandaView({super.key, this.onPindahTab});
@@ -293,8 +303,11 @@ class _DokterBerandaViewState extends State<DokterBerandaView> {
   }
 
   void _bukaChat(Map<String, dynamic> b) {
-    // PINTU 2: cek ulang sebelum masuk halaman chat
-    if (!bisaBukaChat(b)) {
+    // PINTU 2: cek ulang sebelum masuk halaman chat.
+    // Dikonfirmasi = boleh masuk room (aktif: chat penuh,
+    // lewat: tetap boleh masuk tapi mode lihat saja).
+    // Mode lihat-saja-nya dihitung sendiri oleh ChatBookingPage.
+    if (!bisaBukaRoomChat(b)) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text(
@@ -456,10 +469,30 @@ class _DokterBerandaViewState extends State<DokterBerandaView> {
               'Chat terbuka otomatis saat sesi dimulai (${b['jam']}).',
             ),
           ] else if (status == 'dikonfirmasi' && kondisi == 'lewat') ...[
+            // REVISI: sesi berakhir tetap boleh buka ROOM (lihat saja)
             const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 42,
+              child: OutlinedButton.icon(
+                onPressed: () => _bukaChat(b),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF8A8075),
+                  side: const BorderSide(color: _Bd.outline),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+                icon: const Icon(Icons.visibility_rounded, size: 16),
+                label: const Text('Lihat Room Chat',
+                    style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700)),
+              ),
+            ),
+            const SizedBox(height: 8),
             _infoBar(
               Icons.hourglass_bottom_rounded,
-              'Sesi konsultasi sudah berakhir.',
+              'Sesi sudah berakhir — room hanya bisa dilihat, tidak bisa mengirim chat.',
             ),
           ],
           // status 'ditolak' -> tidak ada tombol apa pun (chat terkunci)

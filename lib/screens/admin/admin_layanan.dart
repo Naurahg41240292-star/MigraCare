@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -28,6 +31,22 @@ IconData _ikonJenis(String jenis) {
     default:
       return Icons.science_rounded;
   }
+}
+
+// buang ', Indonesia' di ujung alamat biar rapi
+String _bersihkanAlamat(String alamat) {
+  var s = alamat.trim();
+  final idx = s.toLowerCase().lastIndexOf(', indonesia');
+  if (idx > 0) s = s.substring(0, idx).trim();
+  return s;
+}
+
+// judul singkat buat hasil pencarian lokasi
+String _judulHasilCari(Map<String, dynamic> r) {
+  final n = (r['name'] ?? '').toString().trim();
+  if (n.isNotEmpty) return n;
+  final d = (r['display_name'] ?? '').toString();
+  return d.split(',').first.trim();
 }
 
 // ==================== HALAMAN LIST LAYANAN ====================
@@ -116,6 +135,22 @@ class _AdminLayananPageState extends State<AdminLayananPage> {
     } catch (_) {}
   }
 
+  void _bukaPeta(Map<String, dynamic> data, String nama, String alamat) {
+    final lat = data['lat'];
+    final lng = data['lng'];
+    if (lat is! num || lng is! num) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PetaLayananPage(
+          nama: nama,
+          alamat: alamat,
+          titik: LatLng(lat.toDouble(), lng.toDouble()),
+        ),
+      ),
+    );
+  }
+
   Future<void> _hapus(String docId, String nama) async {
     final yakin = await showDialog<bool>(
       context: context,
@@ -148,6 +183,8 @@ class _AdminLayananPageState extends State<AdminLayananPage> {
     final alamat = (data['alamat'] ?? '').toString();
     final telepon = (data['telepon'] ?? '').toString();
     final jam = (data['jamBuka'] ?? '').toString();
+    final lat = data['lat'];
+    final lng = data['lng'];
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -233,6 +270,29 @@ class _AdminLayananPageState extends State<AdminLayananPage> {
                     ),
                   ),
                 ],
+                if (lat is num && lng is num) ...[
+                  const SizedBox(height: 6),
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => _bukaPeta(data, nama, alamat),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(Icons.map_rounded,
+                            size: 13, color: Color(0xFF1A73E8)),
+                        SizedBox(width: 4),
+                        Text(
+                          'Lihat lokasi di peta',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: Color(0xFF1A73E8),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -269,9 +329,14 @@ class _FormAdminLayananState extends State<FormAdminLayanan> {
   late final TextEditingController _telepon;
   late final TextEditingController _jam;
   late final TextEditingController _deskripsi;
+  final TextEditingController _cari = TextEditingController();
   String _jenis = _jenisLayanan.first;
   LatLng? _titik;
   bool _sedangSimpan = false;
+  bool _sedangCari = false;
+  bool _sedangIsiAlamat = false;
+  String? _cariGagal;
+  List<Map<String, dynamic>> _hasilCari = const [];
 
   bool get _isEdit => widget.docId != null;
 
@@ -301,7 +366,102 @@ class _FormAdminLayananState extends State<FormAdminLayanan> {
     _telepon.dispose();
     _jam.dispose();
     _deskripsi.dispose();
+    _cari.dispose();
     super.dispose();
+  }
+
+  // ===== PETA OTOMATIS: cari lokasi via OpenStreetMap (gratis, tanpa API key) =====
+  Future<List<Map<String, dynamic>>> _cariLokasi(String query) async {
+    if (query.trim().length < 3) return const [];
+    final url = Uri.parse(
+        'https://nominatim.openstreetmap.org/search'
+        '?q=${Uri.encodeQueryComponent(query.trim())}'
+        '&format=json&limit=5&accept-language=id&countrycodes=id');
+    try {
+      final client = HttpClient();
+      client.connectionTimeout = const Duration(seconds: 10);
+      client.userAgent = 'MigraCare/1.0 (aplikasi skrining migrain)';
+      final req = await client.getUrl(url);
+      final res = await req.close();
+      final body = await res.transform(utf8.decoder).join();
+      client.close();
+      final hasil = jsonDecode(body);
+      if (hasil is List) return hasil.cast<Map<String, dynamic>>();
+    } catch (_) {}
+    return const [];
+  }
+
+  Future<void> _jalankanCari() async {
+    final q = _cari.text.trim();
+    if (q.isEmpty || _sedangCari) return;
+    FocusScope.of(context).unfocus();
+    if (q.length < 3) {
+      setState(() => _cariGagal = 'Ketik minimal 3 huruf ya');
+      return;
+    }
+    setState(() {
+      _sedangCari = true;
+      _cariGagal = null;
+    });
+    final hasil = await _cariLokasi(q);
+    if (!mounted) return;
+    setState(() {
+      _sedangCari = false;
+      _hasilCari = hasil;
+      if (hasil.isEmpty) {
+        _cariGagal =
+            'Lokasi nggak ketemu, coba kata kunci lain (mis. "Rumah Sakit Paru Jember")';
+      }
+    });
+  }
+
+  void _pilihHasilCari(Map<String, dynamic> r) {
+    final lat = double.tryParse((r['lat'] ?? '').toString());
+    final lng = double.tryParse((r['lon'] ?? '').toString());
+    if (lat == null || lng == null) return;
+    final titik = LatLng(lat, lng);
+    setState(() {
+      _titik = titik;
+      _hasilCari = const [];
+      _cariGagal = null;
+      final namaTempat =
+          _bersihkanAlamat((r['display_name'] ?? '').toString());
+      if (namaTempat.isNotEmpty) _alamat.text = namaTempat;
+    });
+    FocusScope.of(context).unfocus();
+  }
+
+  // ketuk peta -> titik muncul + alamat terisi otomatis (reverse geocoding)
+  Future<void> _isiAlamatOtomatis(LatLng titik) async {
+    if (_sedangIsiAlamat) return;
+    setState(() => _sedangIsiAlamat = true);
+    final alamat = await _reverseGeocode(titik);
+    if (!mounted) return;
+    setState(() {
+      _sedangIsiAlamat = false;
+      if (alamat.isNotEmpty) _alamat.text = alamat;
+    });
+  }
+
+  Future<String> _reverseGeocode(LatLng titik) async {
+    final url = Uri.parse(
+        'https://nominatim.openstreetmap.org/reverse'
+        '?lat=${titik.latitude}&lon=${titik.longitude}'
+        '&format=json&accept-language=id');
+    try {
+      final client = HttpClient();
+      client.connectionTimeout = const Duration(seconds: 10);
+      client.userAgent = 'MigraCare/1.0 (aplikasi skrining migrain)';
+      final req = await client.getUrl(url);
+      final res = await req.close();
+      final body = await res.transform(utf8.decoder).join();
+      client.close();
+      final hasil = jsonDecode(body);
+      if (hasil is Map<String, dynamic>) {
+        return _bersihkanAlamat((hasil['display_name'] ?? '').toString());
+      }
+    } catch (_) {}
+    return '';
   }
 
   Future<void> _simpan() async {
@@ -361,6 +521,85 @@ class _FormAdminLayananState extends State<FormAdminLayanan> {
         ),
       );
 
+  Widget _bagianCari() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _label('Cari Lokasi'),
+        TextFormField(
+          controller: _cari,
+          textInputAction: TextInputAction.search,
+          onFieldSubmitted: (_) => _jalankanCari(),
+          decoration:
+              _dekor('Contoh: Rumah Sakit Paru Jember').copyWith(
+            prefixIcon: const Icon(Icons.location_on_outlined,
+                color: _W.textGrey),
+            suffixIcon: _sedangCari
+                ? const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                : IconButton(
+                    icon:
+                        const Icon(Icons.search_rounded, color: _W.gold),
+                    onPressed: _jalankanCari,
+                  ),
+          ),
+        ),
+        if (_cariGagal != null) ...[
+          const SizedBox(height: 6),
+          Text(_cariGagal!,
+              style: const TextStyle(
+                  fontSize: 11.5, color: Colors.redAccent)),
+        ],
+        if (_hasilCari.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: _W.outline),
+            ),
+            child: Column(
+              children: [
+                for (final r in _hasilCari)
+                  ListTile(
+                    dense: true,
+                    onTap: () => _pilihHasilCari(r),
+                    leading: const Icon(Icons.place_rounded,
+                        color: Color(0xFFC99A2C)),
+                    title: Text(
+                      _judulHasilCari(r),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: Text(
+                      (r['display_name'] ?? '').toString(),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 11, color: _W.textGrey),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Ketuk salah satu hasil — titik & alamat langsung terisi otomatis',
+            style: TextStyle(fontSize: 11, color: _W.textGrey),
+          ),
+        ],
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -395,11 +634,14 @@ class _FormAdminLayananState extends State<FormAdminLayanan> {
               decoration: _dekor('Pilih jenis layanan'),
             ),
             const SizedBox(height: 14),
+            _bagianCari(),
+            const SizedBox(height: 14),
             _label('Alamat'),
             TextFormField(
               controller: _alamat,
               maxLines: 2,
-              decoration: _dekor('Masukkan alamat lengkap'),
+              decoration:
+                  _dekor('Terisi otomatis dari peta, bisa diedit juga'),
             ),
             const SizedBox(height: 14),
             _label('No. Telepon'),
@@ -427,6 +669,11 @@ class _FormAdminLayananState extends State<FormAdminLayanan> {
             const SizedBox(height: 14),
             _label('Lokasi di Peta'),
             _peta(),
+            const SizedBox(height: 6),
+            const Text(
+              'Ketuk peta atau pakai Cari Lokasi — titik & alamat keluar otomatis',
+              style: TextStyle(fontSize: 11, color: _W.textGrey),
+            ),
             const SizedBox(height: 24),
             Row(
               children: [
@@ -466,18 +713,28 @@ class _FormAdminLayananState extends State<FormAdminLayanan> {
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
       child: SizedBox(
-        height: 200,
+        height: 220,
         child: Stack(
           children: [
+            // key-nya ikut titik: begitu titik berubah (klik hasil cari /
+            // ketuk peta / mode edit), peta langsung melompat & zoom
+            // ke titiknya — tanpa perlu API/controller tambahan
             FlutterMap(
+              key: ValueKey(_titik == null
+                  ? 'peta-kosong'
+                  : 'peta-${_titik!.latitude.toStringAsFixed(6)}-${_titik!.longitude.toStringAsFixed(6)}'),
               options: MapOptions(
                 initialCenter: _titik ?? const LatLng(-8.1728, 113.6983),
-                initialZoom: 13,
-                onTap: (_, titik) => setState(() => _titik = titik),
+                initialZoom: _titik != null ? 16 : 13,
+                onTap: (_, titik) {
+                  setState(() => _titik = titik);
+                  _isiAlamatOtomatis(titik);
+                },
               ),
               children: [
                 TileLayer(
-                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  urlTemplate:
+                      'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                   userAgentPackageName: 'com.example.migracare',
                 ),
                 MarkerLayer(
@@ -507,8 +764,8 @@ class _FormAdminLayananState extends State<FormAdminLayanan> {
                 ),
                 child: Text(
                   _titik == null
-                      ? 'Ketuk peta untuk menandai lokasi'
-                      : 'Lokasi: ${_titik!.latitude.toStringAsFixed(5)}, ${_titik!.longitude.toStringAsFixed(5)}',
+                      ? 'Ketuk peta atau cari lokasi di atas — titik muncul otomatis'
+                      : 'Lokasi: ${_titik!.latitude.toStringAsFixed(5)}, ${_titik!.longitude.toStringAsFixed(5)}${_sedangIsiAlamat ? '  •  mengambil alamat...' : ''}',
                   textAlign: TextAlign.center,
                   style: const TextStyle(color: Colors.white, fontSize: 11),
                 ),
@@ -516,6 +773,107 @@ class _FormAdminLayananState extends State<FormAdminLayanan> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ==================== HALAMAN PETA LOKASI LAYANAN ====================
+class PetaLayananPage extends StatelessWidget {
+  final String nama;
+  final String alamat;
+  final LatLng titik;
+  const PetaLayananPage({
+    super.key,
+    required this.nama,
+    required this.alamat,
+    required this.titik,
+  });
+
+  Future<void> _bukaArah() async {
+    final url = Uri.parse(
+        'https://www.google.com/maps/search/?api=1&query=${titik.latitude},${titik.longitude}');
+    try {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: _W.bg,
+      appBar: AppBar(
+        backgroundColor: _W.bg,
+        elevation: 0,
+        foregroundColor: _W.textDark,
+        title: Text(nama,
+            style:
+                const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: FlutterMap(
+              options: MapOptions(initialCenter: titik, initialZoom: 16),
+              children: [
+                TileLayer(
+                  urlTemplate:
+                      'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  userAgentPackageName: 'com.example.migracare',
+                ),
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: titik,
+                      width: 46,
+                      height: 46,
+                      child: const Icon(Icons.location_on_rounded,
+                          color: Colors.redAccent, size: 42),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Container(
+            width: double.infinity,
+            color: Colors.white,
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (alamat.isNotEmpty) ...[
+                  Row(
+                    children: [
+                      const Icon(Icons.place_rounded,
+                          size: 14, color: _W.textGrey),
+                      const SizedBox(width: 5),
+                      Expanded(
+                        child: Text(alamat,
+                            style: const TextStyle(
+                                fontSize: 12, color: _W.textGrey)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                ],
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFC9822E),
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                    ),
+                    onPressed: _bukaArah,
+                    icon: const Icon(Icons.navigation_rounded, size: 18),
+                    label: const Text('Buka Arah di Google Maps'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
