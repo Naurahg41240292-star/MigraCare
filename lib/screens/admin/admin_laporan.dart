@@ -3,6 +3,9 @@ import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 
 /// ============================================================
 /// HALAMAN LAPORAN ADMIN — MigraCare
@@ -18,6 +21,7 @@ import 'package:google_fonts/google_fonts.dart';
 const String kKoleksiPengguna = 'users';
 const String kKoleksiArtikel = 'artikel'; // koleksi artikel (ditulis admin)
 const String kKoleksiLayanan = 'layanan'; // koleksi faskes (ditulis admin)
+const String kKoleksiSkrining = 'skrining'; // koleksi hasil skrining 
 
 const List<String> kPathTanggal = [
   'createdAt', 'dibuatPada', 'dibuat', 'tanggalDibuat', 'dibuat_pada',
@@ -26,6 +30,7 @@ const List<String> kPathTanggal = [
 const List<String> kPathRole = ['akun.role', 'role', 'akun.peran', 'peran'];
 const List<String> kPathKategori = ['kategori', 'category', 'topik'];
 const List<String> kPathJenisLayanan = ['jenis', 'tipe', 'type', 'kategori', 'hasil', 'status'];
+const List<String> kPathHasilSkrining = ['hasil', 'hasilSkrining', 'kategori', 'status', 'risiko'];
 // =====================================================================
 
 // ========================= WARNA =========================
@@ -71,12 +76,26 @@ DateTime? _keDateTime(dynamic v) {
   return null;
 }
 
-/// Samakan istilah role: user/pasien/umum → 'pengguna', dst.
+// Samakan istilah role: user/pasien/umum → 'pengguna', dst.
 String _normalisasiRole(String raw) {
   final s = raw.toLowerCase().trim();
   if (s == 'dokter') return 'dokter';
   if (s == 'admin' || s == 'administrator') return 'admin';
   return 'pengguna'; // user, pasien, umum, pengguna, kosong
+}
+
+// Samakan istilah hasil skrining → 'berisiko' / 'tidak berisiko' / 'lainnya'
+String _normalisasiHasil(Map<String, dynamic> data, String? path) {
+  if (path == null) return 'lainnya';
+  final v = (_bacaField(data, path)?.toString() ?? '').toLowerCase().trim();
+  if (v.isEmpty) return 'lainnya';
+  if (v.contains('tidak') || v.contains('bukan') || v.contains('not') || v.contains('non')) {
+    return 'tidak berisiko';
+  }
+  if (v.contains('risiko') || v.contains('risk') || v.contains('positif')) {
+    return 'berisiko';
+  }
+  return 'lainnya';
 }
 
 // ==================== MODEL ====================
@@ -104,7 +123,7 @@ class _DataLaporan {
       this.total, this.persen, this.grafik, this.rincian, this.adaTanggal);
 }
 
-enum TabLaporan { pengguna, artikel, layanan }
+enum TabLaporan { pengguna, artikel, layanan, skrining }
 
 // ==================== HALAMAN UTAMA ====================
 class AdminLaporanPage extends StatefulWidget {
@@ -137,12 +156,25 @@ class _AdminLaporanPageState extends State<AdminLaporanPage> {
     // users / artikel / layanan (koleksi yang ditulis admin).
     // ⚠️ Jangan pakai collectionGroup('screenings') — query itu butuh
     //    rules wildcard khusus dan bukan maksud tab "Layanan" lagi.
-    final nama = switch (_tab) {
+        final nama = switch (_tab) {
       TabLaporan.pengguna => kKoleksiPengguna,
       TabLaporan.artikel => kKoleksiArtikel,
       TabLaporan.layanan => kKoleksiLayanan,
+      TabLaporan.skrining => kKoleksiSkrining,
     };
-    return db.collection(nama).get();
+    final snap = await db.collection(nama).get();
+
+    // Tab skrining: kalau koleksi 'skrining' kosong, coba baca
+    // subcollection 'screenings' di dalam users (pola penyimpanan lain).
+    if (_tab == TabLaporan.skrining && snap.docs.isEmpty) {
+      try {
+        final cg = await db.collectionGroup('screenings').get();
+        if (cg.docs.isNotEmpty) return cg;
+      } catch (_) {
+        // rules tidak mengizinkan — lanjut pakai snapshot kosong
+      }
+    }
+    return snap;
   }
 
   Future<_DataLaporan> _muatData() async {
@@ -155,6 +187,7 @@ class _AdminLaporanPageState extends State<AdminLaporanPage> {
       TabLaporan.pengguna => kPathRole,
       TabLaporan.artikel => kPathKategori,
       TabLaporan.layanan => kPathJenisLayanan,
+      TabLaporan.skrining => kPathHasilSkrining,
     };
     String? pathTanggal;
     String? pathGrup;
@@ -222,6 +255,11 @@ class _AdminLaporanPageState extends State<AdminLaporanPage> {
         totalGrup.putIfAbsent(r, () => 0);
       }
     }
+    if (_tab == TabLaporan.skrining) {
+      for (final r in ['berisiko', 'tidak berisiko']) {
+        totalGrup.putIfAbsent(r, () => 0);
+      }
+    }
 
     final rincian = totalGrup.entries.map((e) {
       final (label, ikon) = _detailGrup(e.key);
@@ -239,6 +277,7 @@ class _AdminLaporanPageState extends State<AdminLaporanPage> {
   }
 
   String _nilaiGrup(Map<String, dynamic> data, String? path) {
+    if (_tab == TabLaporan.skrining) return _normalisasiHasil(data, path);
     if (path == null) return _tab == TabLaporan.layanan ? 'screening' : 'lainnya';
     final v = _bacaField(data, path)?.toString().trim() ?? '';
     if (v.isEmpty) return _tab == TabLaporan.layanan ? 'screening' : 'lainnya';
@@ -264,11 +303,20 @@ class _AdminLaporanPageState extends State<AdminLaporanPage> {
           nilai == 'lainnya' ? 'Tanpa Kategori' : nilai,
           Icons.article_outlined
         );
-      case TabLaporan.layanan:
+            case TabLaporan.layanan:
         return (
           nilai == 'screening' ? 'Screening' : nilai,
           Icons.medical_services_outlined
         );
+      case TabLaporan.skrining:
+        switch (nilai) {
+          case 'berisiko':
+            return ('Berisiko Migraine', Icons.warning_amber_rounded);
+          case 'tidak berisiko':
+            return ('Tidak Berisiko', Icons.check_circle_outline);
+          default:
+            return ('Hasil Lainnya', Icons.help_outline);
+        }
     }
   }
 
@@ -277,6 +325,14 @@ class _AdminLaporanPageState extends State<AdminLaporanPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _latar,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _unduhPdf,
+        backgroundColor: _coklat,
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.download_rounded),
+        label: const Text('Unduh PDF',
+            style: TextStyle(fontWeight: FontWeight.w600)),
+      ),
       body: SafeArea(
         child: Column(
           children: [
@@ -347,6 +403,94 @@ class _AdminLaporanPageState extends State<AdminLaporanPage> {
     );
   }
 
+  bool _sedangUnduhPdf = false;
+
+  Future<void> _unduhPdf() async {
+    if (_sedangUnduhPdf) return;
+    _sedangUnduhPdf = true;
+    try {
+      final data = await _muatData();
+      final pdf = pw.Document();
+
+      final rows = data.rincian
+          .map((r) => [
+                r.label,
+                _formatAngka(r.jumlah),
+                '${r.persen.abs().round()}%',
+              ])
+          .toList();
+
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          build: (ctx) => [
+            pw.Text('MigraCare',
+                style: pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
+            pw.SizedBox(height: 4),
+            pw.Text('Laporan ${_labelTab(_tab)}',
+                style:
+                    pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+            pw.SizedBox(height: 4),
+            pw.Text('Periode: ${_fmtTanggal(_awal)} s/d ${_fmtTanggal(_akhir)}',
+                style: pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
+            pw.Text('Dicetak: ${_fmtTanggal(DateTime.now())}',
+                style: pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
+            pw.SizedBox(height: 16),
+            pw.Container(
+              width: double.infinity,
+              padding: const pw.EdgeInsets.all(12),
+              decoration: pw.BoxDecoration(
+                color: PdfColors.amber50,
+                border: pw.Border.all(color: PdfColors.amber200),
+                borderRadius: pw.BorderRadius.circular(8),
+              ),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text('Ringkasan',
+                      style: pw.TextStyle(
+                          fontSize: 12, fontWeight: pw.FontWeight.bold)),
+                  pw.SizedBox(height: 6),
+                  pw.Bullet(text: 'Jumlah total: ${_formatAngka(data.total)}'),
+                  pw.Bullet(
+                      text:
+                          'Perubahan dari periode sebelumnya: ${data.persen.round()}%'),
+                ],
+              ),
+            ),
+            pw.SizedBox(height: 16),
+            pw.TableHelper.fromTextArray(
+              headers: ['Kategori', 'Jumlah', 'Perubahan'],
+              data: rows,
+              headerStyle:
+                  pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
+              cellStyle: pw.TextStyle(fontSize: 10),
+              cellAlignment: pw.Alignment.centerLeft,
+              headerDecoration: pw.BoxDecoration(color: PdfColors.grey200),
+              border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+              columnWidths: {
+                0: pw.FlexColumnWidth(3),
+                1: pw.FlexColumnWidth(2),
+                2: pw.FlexColumnWidth(2),
+              },
+            ),
+          ],
+        ),
+      );
+
+      await Printing.sharePdf(
+        bytes: await pdf.save(),
+        filename: 'laporan_${_tab.name}_migracare.pdf',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal membuat PDF: $e')),
+      );
+    } finally {
+      _sedangUnduhPdf = false;
+    }
+  }
   Widget _bannerPeringatan() {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -642,16 +786,18 @@ class _AdminLaporanPageState extends State<AdminLaporanPage> {
     );
   }
 
-  String _labelTab(TabLaporan t) => switch (t) {
+    String _labelTab(TabLaporan t) => switch (t) {
         TabLaporan.pengguna => 'Pengguna',
         TabLaporan.artikel => 'Artikel',
         TabLaporan.layanan => 'Layanan',
+        TabLaporan.skrining => 'Skrining',
       };
 
-  String _judulKartu(TabLaporan t) => switch (t) {
+    String _judulKartu(TabLaporan t) => switch (t) {
         TabLaporan.pengguna => 'Jumlah Pengguna',
         TabLaporan.artikel => 'Jumlah Artikel',
         TabLaporan.layanan => 'Jumlah Layanan',
+        TabLaporan.skrining => 'Jumlah Skrining',
       };
 }
 
