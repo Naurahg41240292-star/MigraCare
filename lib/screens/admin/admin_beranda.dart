@@ -420,7 +420,7 @@ class _AdminBerandaPageState extends State<AdminBerandaPage> {
                 _statKecil('Layanan', '0',
                     onTap: () => setState(() => _index = 3)),
                 const SizedBox(width: 12),
-                _statKecil('Dokter', '$_totalDokter',
+                _statKecil('Manajemen User', '$_totalDokter',
                     onTap: () => setState(() => _index = 4)),
               ],
             ),
@@ -495,34 +495,46 @@ class _AdminBerandaPageState extends State<AdminBerandaPage> {
     );
   }
 
-  Widget _statKecil(String judul, String nilai, {VoidCallback? onTap}) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: _Ab.outline),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(judul,
-                  style: const TextStyle(fontSize: 11.5, color: _Ab.textGrey)),
-              const SizedBox(height: 6),
-              Text(nilai,
-                  style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                      color: _Ab.textDark)),
-            ],
-          ),
+  
+Widget _statKecil(String judul, String nilai, {VoidCallback? onTap}) {
+  return Expanded(
+    child: GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 97,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: _Ab.outline),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              judul,
+              maxLines: 2,
+              style: const TextStyle(
+                fontSize: 11.5,
+                color: _Ab.textGrey,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              nilai,
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: _Ab.textDark,
+              ),
+            ),
+          ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }
 
 // ==================== TAB 4: PENGATURAN ====================
