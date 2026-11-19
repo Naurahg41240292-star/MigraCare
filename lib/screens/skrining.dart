@@ -627,6 +627,9 @@ class _SkriningPageState extends State<SkriningPage> {
                 }),
               ),
 
+              // Keterangan kondisi nyeri pada penyakit migrain
+              _intensitasInfoCard(),
+
               const SizedBox(height: 20),
 
               // -------------------- DURASI ---------------------------------
@@ -1181,6 +1184,132 @@ class _SkriningPageState extends State<SkriningPage> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  //  KETERANGAN NYERI MIGRAIN
+  //  Revisi: menambahkan deskripsi kondisi nyeri yang dimaksud pada
+  //  penyakit migrain di bawah section "Intensitas Nyeri".
+  //  Sumber: International Classification of Headache Disorders, 3rd Edition
+  //  (ICHD-3) — Headache Classification Committee of the IHS, 2018.
+  // -------------------------------------------------------------------------
+
+  Widget _intensitasInfoCard() {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: _Sk.chipBorder,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(
+                Icons.info_outline_rounded,
+                size: 18,
+                color: _Sk.control,
+              ),
+              SizedBox(width: 8),
+              Text(
+                'Tentang Nyeri Migrain',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textDark,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Migrain adalah jenis sakit kepala primer yang '
+            'ditandai dengan nyeri berdenyut, umumnya pada satu '
+            'sisi kepala, dengan intensitas sedang hingga berat. '
+            'Nyeri dapat memburuk saat aktivitas fisik dan '
+            'berlangsung 4–72 jam bila tidak ditangani, sering '
+            'disertai mual serta sensitif terhadap cahaya dan '
+            'suara.',
+            style: TextStyle(
+              fontSize: 11.5,
+              height: 1.5,
+              color: AppColors.textDark,
+            ),
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'Tingkat Intensitas:',
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textDark,
+            ),
+          ),
+          const SizedBox(height: 4),
+          _bulletItem(
+            'Tidak Ada — Tidak ada nyeri sama sekali.',
+          ),
+          _bulletItem(
+            'Ringan — Nyeri dapat ditoleransi, aktivitas '
+            'sehari-hari tidak terganggu.',
+          ),
+          _bulletItem(
+            'Sedang — Nyeri mengganggu aktivitas sehari-hari, '
+            'namun masih dapat berjalan.',
+          ),
+          _bulletItem(
+            'Berat — Nyeri sangat hebat, tidak dapat '
+            'beraktivitas, biasanya perlu berbaring di ruang '
+            'gelap.',
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Sumber: International Classification of Headache '
+            'Disorders, 3rd Edition (ICHD-3), 2018.',
+            style: TextStyle(
+              fontSize: 10,
+              fontStyle: FontStyle.italic,
+              color: AppColors.textGrey,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _bulletItem(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2, left: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '•  ',
+            style: TextStyle(
+              fontSize: 11.5,
+              color: _Sk.control,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                fontSize: 11.5,
+                height: 1.4,
+                color: AppColors.textDark,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
