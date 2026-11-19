@@ -13,12 +13,17 @@ import 'detail_dokter.dart';
 import 'dokter/chat_booking.dart';
 
 // ===========================================================================
-//  ATURAN SESI CHAT (identik dengan beranda dokter & halaman chat)
-//  Chat hanya boleh dibuka kalau:
-//  1. Status booking = 'dikonfirmasi'
-//  2. Waktu sekarang DI DALAM sesi: jam booking s/d jam booking + durasi
-//  Booking 'ditolak' / 'menunggu' / yang tanggalnya sudah lewat
-//  -> tombol chat tidak muncul (dan halaman chat juga tetap menolak).
+//  ATURAN SESI CHAT (revisi: sesi berakhir tetap bisa buka ROOM — lihat saja)
+//  ---------------------------------------------------------------------------
+//  - Booking 'ditolak'    -> tombol chat hilang total (terkunci)
+//  - Booking 'menunggu'   -> info "Menunggu konfirmasi dokter" (bukan chat)
+//  - Sesi AKTIF (dikonfirmasi, jam mulai <= sekarang <= jam selesai)
+//        -> tombol 'Chat Sekarang' : chat penuh, bisa kirim pesan
+//  - Sesi BERAKHIR (dikonfirmasi, sekarang > jam selesai)
+//        -> tombol 'Lihat Riwayat Chat' : room masih bisa dibuka,
+//           riwayat pesan kelihatan, tapi TIDAK bisa kirim pesan lagi
+//           (mode lihat saja diatur di dalam ChatBookingPage — file chat
+//           yang sama dipakai dokter & pasien)
 // ===========================================================================
 
 const Map<String, int> _namaBulan = {
@@ -156,6 +161,17 @@ bool _bisaBukaChat(Map<String, dynamic> b, {DateTime? sekarang}) {
   // format tanggal aneh/kosong -> jangan blokir (biar demo tetap jalan)
   if (kondisi == 'tidak_diketahui') return true;
   return kondisi == 'aktif';
+}
+
+/// REVISI: room chat boleh DIBUKA kalau status 'dikonfirmasi' —
+/// TERMASUK saat sesi sudah berakhir (mode lihat saja, tidak bisa kirim).
+/// Dipakai untuk tombol 'Lihat Riwayat Chat' di kartu berstatus 'Selesai'.
+bool _bisaBukaRoomChat(Map<String, dynamic> b, {DateTime? sekarang}) {
+  if ((b['status'] ?? '').toString() != 'dikonfirmasi') return false;
+  final kondisi = _hitungKondisiSesi(b, sekarang: sekarang);
+  // format tanggal aneh/kosong -> jangan blokir (biar demo tetap jalan)
+  if (kondisi == 'tidak_diketahui') return true;
+  return kondisi == 'aktif' || kondisi == 'lewat';
 }
 
 class KonsultasiScreen extends StatefulWidget {
@@ -314,12 +330,31 @@ class _KonsultasiScreenState extends State<KonsultasiScreen> {
 
   // ✅ buka chat BOOKING (pasien ↔ dokter asli)
   void _bukaChatBooking(Map<String, dynamic> b) {
+    // PINTU 2: cek ulang sebelum masuk halaman chat.
+    // Dikonfirmasi = boleh masuk room (aktif: chat penuh,
+    // lewat: tetap boleh masuk tapi mode lihat saja).
+    // Mode lihat-saja-nya dihitung sendiri oleh ChatBookingPage.
+    final booking = b['booking'] as Map<String, dynamic>;
+    if (!_bisaBukaRoomChat(booking)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+              'Sesi konsultasi tidak sedang berlangsung — chat terkunci.'),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: const Color(0xFF3D2B1A),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+      return;
+    }
+
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => ChatBookingPage(
           bookingId: b['id'],
-          booking: b['booking'] as Map<String, dynamic>,
+          booking: booking,
           sayaDokter: false, // ← dari sisi PASIEN
         ),
       ),
@@ -574,10 +609,30 @@ class _KonsultasiScreenState extends State<KonsultasiScreen> {
               'Chat terbuka saat sesi dimulai (${b['jam']}).',
             ),
           ] else if (status == 'dikonfirmasi' && kondisi == 'lewat') ...[
+            // REVISI: sesi berakhir tetap boleh buka ROOM (lihat saja)
             const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 42,
+              child: OutlinedButton.icon(
+                onPressed: () => _bukaChatBooking(b),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF8A8075),
+                  side: const BorderSide(color: Color(0xFFE5DCCB)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+                icon: const Icon(Icons.visibility_rounded, size: 16),
+                label: const Text('Lihat Riwayat Chat',
+                    style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700)),
+              ),
+            ),
+            const SizedBox(height: 8),
             _infoRiwayat(
               Icons.hourglass_bottom_rounded,
-              'Sesi konsultasi sudah berakhir.',
+              'Sesi sudah berakhir — chat hanya bisa dilihat, tidak bisa mengirim pesan.',
             ),
           ] else if (status == 'menunggu' && kondisi != 'lewat') ...[
             const SizedBox(height: 12),

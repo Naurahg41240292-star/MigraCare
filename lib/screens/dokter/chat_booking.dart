@@ -7,12 +7,14 @@ import 'dokter_detail_pasien.dart';
 ///  MIGRACARE — Chat Pasien ↔ Dokter (berbasis Booking, realtime Firestore)
 ///  - ✅ [REVISI DOSEN] Durasi sesi ikut pilihan dokter (15 / 30 / 60 menit)
 ///  - ✅ [REVISI DOSEN] Sesi chat TERIKAT SLOT BOOKING:
-///        mulai  = jam booking
+///        mulai    = jam booking
 ///        berakhir = jam booking + durasi
-///    Di luar window itu chat TERKUNCI:
-///      • sebelum jam booking -> layar "Chat Belum Dibuka" + hitung mundur
-///      • setelah sesi lewat  -> ditendang keluar (tidak bisa chat lagi)
-///      • status 'ditolak' / 'menunggu' -> ditendang keluar
+///    Di luar window itu:
+///      • sebelum jam booking         -> layar "Chat Belum Dibuka" + hitung mundur
+///      • setelah sesi lewat          -> ✅ [REVISI] MASIH bisa buka room,
+///                                       tapi mode LIHAT SAJA: riwayat pesan
+///                                       kelihatan, input mati, tidak bisa kirim
+///      • status 'ditolak'/'menunggu' -> ditendang keluar
 ///    Field chatDimulaiPada tetap ditulis sebagai penanda, tapi tidak
 ///    lagi menentukan akhir sesi.
 ///  - Dokter bisa kirim pesan REKOMENDASI (tampil khusus)
@@ -179,11 +181,16 @@ class _ChatBookingPageState extends State<ChatBookingPage> {
   int _sisaDetik = -1;
   bool _sudahDialogBerakhir = false;
 
+  // ✅ [REVISI] Mode lihat saja: sesi sudah berakhir -> room tetap bisa
+  // dibuka, riwayat pesan kebaca, tapi TIDAK bisa kirim pesan lagi.
+  bool _lihatSaja = false;
+
   // 🔒 Gerbang jadwal: true = belum jam booking, chat terkunci
   bool _gerbangTutup = false;
   Timer? _gerbangTicker;
 
   // 🔒 Kalau tidak null -> halaman ditendang keluar dengan alasan ini
+  //    (sekarang hanya untuk status 'ditolak' / 'menunggu')
   String? _alasanTerkunci;
 
   FirebaseFirestore get _db => FirebaseFirestore.instance;
@@ -252,8 +259,12 @@ class _ChatBookingPageState extends State<ChatBookingPage> {
         } else {
           final akhir = _akhirSesi;
           if (akhir != null && sekarang.isAfter(akhir)) {
-            _alasanTerkunci =
-                'Jadwal konsultasi sudah lewat — sesi chat berakhir.';
+            // ✅ [REVISI] sesi sudah lewat -> TIDAK ditendang lagi.
+            // Masuk room dalam mode LIHAT SAJA (riwayat kebaca,
+            // input mati). Dialog "Sesi Berakhir" sengaja tidak
+            // di-pop-up karena sesinya bukan berakhir di depan mata.
+            _lihatSaja = true;
+            _sudahDialogBerakhir = true;
           }
         }
       }
@@ -358,9 +369,13 @@ class _ChatBookingPageState extends State<ChatBookingPage> {
     final sisa = akhir.difference(DateTime.now()).inSeconds;
     final baru = sisa < 0 ? 0 : sisa;
     if (baru != _sisaDetik) setState(() => _sisaDetik = baru);
-    if (baru == 0 && !_sudahDialogBerakhir) {
-      _sudahDialogBerakhir = true;
-      _showDialogBerakhir();
+    if (baru == 0) {
+      // ✅ [REVISI] sesi habis -> mode lihat saja (bukan ditendang)
+      if (!_lihatSaja) setState(() => _lihatSaja = true);
+      if (!_sudahDialogBerakhir) {
+        _sudahDialogBerakhir = true;
+        _showDialogBerakhir();
+      }
     }
   }
 
@@ -385,8 +400,9 @@ class _ChatBookingPageState extends State<ChatBookingPage> {
           ],
         ),
         content: Text(
-          'Waktu konsultasi ${_labelDurasi(_durasiMenit)} sudah habis. '
-          'Chat ditutup otomatis sesuai jadwal booking.',
+          'Waktu konsultasi ${_labelDurasi(_durasiMenit)} sudah habis '
+          'sesuai jadwal booking. Kamu masih bisa melihat riwayat chat, '
+          'tapi tidak bisa mengirim pesan lagi.',
           style: const TextStyle(
               fontSize: 13, height: 1.5, color: _Cb.textGrey),
         ),
@@ -421,6 +437,8 @@ class _ChatBookingPageState extends State<ChatBookingPage> {
 
   Future<void> _kirimPesan(String teks, String tipe) async {
     if (teks.trim().isEmpty) return;
+    // ✅ [REVISI] pengaman kedua: mode lihat saja tidak bisa kirim apa pun
+    if (_lihatSaja || _sesiHabis) return;
     await _pesanRef.add({
       'dari': _peranSaya,
       'namaPengirim': _namaSaya,
@@ -557,8 +575,8 @@ class _ChatBookingPageState extends State<ChatBookingPage> {
             Text(
               _gerbangTutup
                   ? 'Chat dibuka saat jadwal booking'
-                  : _sesiHabis
-                      ? 'Sesi ${_labelDurasi(_durasiMenit)} berakhir'
+                  : (_sesiHabis || _lihatSaja)
+                      ? 'Sesi ${_labelDurasi(_durasiMenit)} berakhir — lihat saja'
                       : (_sisaDetik < 0
                           ? 'Sesi konsultasi berjalan'
                           : 'Sesi: $_formatSisa tersisa'),
@@ -567,7 +585,7 @@ class _ChatBookingPageState extends State<ChatBookingPage> {
                   fontWeight: FontWeight.w700,
                   color: _gerbangTutup
                       ? _Cb.textGrey
-                      : _sesiHabis
+                      : (_sesiHabis || _lihatSaja)
                           ? _Cb.textFaint
                           : _Cb.online),
             ),
@@ -586,6 +604,8 @@ class _ChatBookingPageState extends State<ChatBookingPage> {
           ? _gerbangTutupView()
           : Column(
               children: [
+                // ✅ [REVISI] banner mode lihat saja (sesi sudah berakhir)
+                if (_lihatSaja) _bannerLihatSaja(),
                 Expanded(
                   child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                     stream: _pesanRef
@@ -628,6 +648,30 @@ class _ChatBookingPageState extends State<ChatBookingPage> {
                 _barInput(),
               ],
             ),
+    );
+  }
+
+  // ✅ [REVISI] banner kecil di atas room saat mode lihat saja
+  Widget _bannerLihatSaja() {
+    return Container(
+      width: double.infinity,
+      color: const Color(0xFFF1ECE2),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: const [
+          Icon(Icons.visibility_rounded, size: 14, color: Color(0xFF8A8075)),
+          SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              'Sesi sudah berakhir — mode lihat saja. Riwayat chat masih bisa dibaca.',
+              style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF8A8075)),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -813,7 +857,8 @@ class _ChatBookingPageState extends State<ChatBookingPage> {
   }
 
   Widget _barInput() {
-    final mati = _sesiHabis;
+    // ✅ [REVISI] mati kalau sesi habis ATAU mode lihat saja
+    final mati = _sesiHabis || _lihatSaja;
     final bisaKirim = _controller.text.trim().isNotEmpty && !mati;
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
@@ -853,7 +898,7 @@ class _ChatBookingPageState extends State<ChatBookingPage> {
                     border: InputBorder.none,
                     isDense: true,
                     hintText: mati
-                        ? 'Sesi ${_labelDurasi(_durasiMenit)} telah berakhir'
+                        ? 'Sesi ${_labelDurasi(_durasiMenit)} berakhir — mode lihat saja'
                         : 'Ketik pesan...',
                     hintStyle:
                         const TextStyle(fontSize: 13.5, color: _Cb.textFaint),
