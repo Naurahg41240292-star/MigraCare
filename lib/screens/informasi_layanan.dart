@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'detail_layanan.dart';
+import 'filter_layanan.dart';
 
 /// ==========================================================================
 ///  MIGRACARE — Halaman Informasi Layanan Kesehatan (pencarian + filter)
@@ -197,6 +198,7 @@ class InformasiLayananPage extends StatefulWidget {
 class _InformasiLayananPageState extends State<InformasiLayananPage> {
   String _query = '';
   int _selectedKategori = 0; // default: Rumah Sakit (sesuai Figma)
+  FilterLayanan _filter = const FilterLayanan();
 
   void _showSnack(String message) {
     ScaffoldMessenger.of(context)
@@ -231,7 +233,7 @@ class _InformasiLayananPageState extends State<InformasiLayananPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ================= HEADER =================
+                        // ================= HEADER =================
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
               child: Row(
@@ -252,10 +254,33 @@ class _InformasiLayananPageState extends State<InformasiLayananPage> {
                       ),
                     ),
                   ),
-                  IconButton(
-                    onPressed: () => _showSnack('Fitur filter lanjutan segera'),
-                    icon: const Icon(Icons.filter_list_rounded),
-                    color: AppColors.darkBrown,
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.filter_list_rounded),
+                        color: AppColors.darkBrown,
+                        onPressed: () async {
+                          final hasil = await showFilterLayananSheet(context, _filter);
+                          if (hasil != null) {
+                            setState(() => _filter = hasil);
+                          }
+                        },
+                      ),
+                      if (_filter.aktif)
+                        Positioned(
+                          right: 10,
+                          top: 10,
+                          child: Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ],
               ),
