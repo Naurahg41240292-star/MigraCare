@@ -24,7 +24,6 @@ class Layanan {
   const Layanan({
     required this.name,
     required this.location,
-    required this.distance,
     required this.rating,
     required this.reviews,
     required this.imagePath,
@@ -44,7 +43,6 @@ class Layanan {
 
   final String name;
   final String location;
-  final String distance;
   final double rating;
   final int reviews;
   final String imagePath;
@@ -65,7 +63,6 @@ const List<Layanan> daftarLayanan = [
     name: 'RS AL Huda Banyuwangi',
     category: 'Rumah Sakit',
     location: 'RS Al-Huda, Jl. Raya Gambiran No. 225 Genteng, Dusun Krajan II, Gambiran, Kec. Gambiran, Kabupaten Banyuwangi, Jawa Timur 68465',
-    distance: '± 3,2 km',
     rating: 4.7,
     reviews: 210,
     icon: Icons.local_hospital,
@@ -89,7 +86,6 @@ const List<Layanan> daftarLayanan = [
     name: 'RS. Jember Klinik',
     category: 'Rumah Sakit',
     location: 'Jl. Bedadung No.2, Kp. Using, Jemberlor, Kec. Patrang, Kabupaten Jember, Jawa Timur 68118',
-    distance: '± 12 km',
     rating: 4.8,
     reviews: 150,
     icon: Icons.local_hospital,
@@ -104,7 +100,6 @@ const List<Layanan> daftarLayanan = [
     name: 'RSUD Dr. Haryoto Lumajang',
     category: 'Rumah Sakit',
     location: 'Rumah Sakit Umum Daerah (RSUD) Dr. Haryoto, Jl. Basuki Rahmat No.5, Tompokersan, Kec. Lumajang, Kabupaten Lumajang, Jawa Timur 67311',
-    distance: '± 45 km',
     rating: 4.5,
     reviews: 142,
     icon: Icons.local_hospital,
@@ -118,7 +113,6 @@ const List<Layanan> daftarLayanan = [
     name: 'Apotek K-24',
     category: 'Apotek',
     location: 'Apotek K-24, Jl. Kalimantan No.11A, Krajan Timur, Sumbersari, Kec. Sumbersari, Kabupaten Jember, Jawa Timur 68121',
-    distance: '± 1,4 km',
     rating: 4.8,
     reviews: 68,
     icon: Icons.local_pharmacy,
@@ -134,7 +128,6 @@ const List<Layanan> daftarLayanan = [
     name: 'Apotek Sehat Jember',
     category: 'Apotek',
     location: 'Jember, Jawa Timur',
-    distance: '± 3,6 km',
     rating: 4.3,
     reviews: 120,
     icon: Icons.local_pharmacy,
@@ -147,7 +140,6 @@ const List<Layanan> daftarLayanan = [
     name: 'Klinik Pratama Sehat Bersama',
     category: 'Klinik',
     location: 'Banyuwangi, Jawa Timur',
-    distance: '± 4,5 km',
     rating: 4.9,
     reviews: 120,
     icon: Icons.medical_services_rounded,
@@ -162,7 +154,6 @@ const List<Layanan> daftarLayanan = [
     name: 'Laboratorium Klinik Prodia',
     category: 'Laboratorium',
     location: 'Banyuwangi, Jawa Timur',
-    distance: '± 2,8 km',
     rating: 4.7,
     reviews: 90,
     icon: Icons.science_rounded,
@@ -496,15 +487,6 @@ class _LayananCard extends StatelessWidget {
                         ),
                         Text(
                           ' (${layanan.reviews} ulasan)',
-                          style: const TextStyle(
-                              fontSize: 10.5, color: AppColors.textGrey),
-                        ),
-                        const SizedBox(width: 8),
-                        const Icon(Icons.near_me_rounded,
-                            size: 12, color: AppColors.accentDark),
-                        const SizedBox(width: 3),
-                        Text(
-                          layanan.distance,
                           style: const TextStyle(
                               fontSize: 10.5, color: AppColors.textGrey),
                         ),

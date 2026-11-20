@@ -289,15 +289,6 @@ class _DetailLayananPageState extends State<DetailLayananPage> {
                       style: const TextStyle(
                           fontSize: 12, color: AppColors.textGrey),
                     ),
-                    const SizedBox(width: 12),
-                    const Icon(Icons.near_me_rounded,
-                        size: 15, color: AppColors.accentDark),
-                    const SizedBox(width: 4),
-                    Text(
-                      l.distance,
-                      style: const TextStyle(
-                          fontSize: 12, color: AppColors.textGrey),
-                    ),
                   ],
                 ),
               ),
